@@ -56,7 +56,7 @@ public class DistributedMutualExclusion {
 
         void assignPrivilege() {
             if (holder.equals(getSelf()) & !using & !requestQ.isEmpty()) {
-                holder = requestQ.remove()
+                holder = requestQ.remove();
                 asked = false;
                 if (holder.equals(getSelf())) {
                     using = true;
