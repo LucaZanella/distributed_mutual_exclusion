@@ -64,3 +64,4 @@ nb-configuration.xml
 ## Gradle
 ##########################
 .gradle/
+/distributed_mutual_exclusion/.nb-gradle

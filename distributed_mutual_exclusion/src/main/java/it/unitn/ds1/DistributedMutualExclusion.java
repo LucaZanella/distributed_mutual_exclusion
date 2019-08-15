@@ -6,32 +6,37 @@ import akka.actor.ActorSystem;
 import akka.actor.Props;
 import akka.actor.Inbox;
 import akka.actor.Cancellable;
+import java.io.IOException;
 import scala.concurrent.duration.Duration;
 import scala.concurrent.duration.FiniteDuration;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Collections;
+
 
 public class DistributedMutualExclusion {
+    final static int N_NODES= 10;
 
-    public class InitializeMessage implements Serializable {}
+    public static class InitializeMessage implements Serializable {}
 
-    public class RequestMessage implements Serializable {}
+    public static class RequestMessage implements Serializable {}
 
-    public class PrivilegeMessage implements Serializable {}
+    public static class PrivilegeMessage implements Serializable {}
 
-    public class RestartMessage implements Serializable {}
+    public static class RestartMessage implements Serializable {}
 
-    public class AdviseMessage implements Serializable {}
+    public static class AdviseMessage implements Serializable {}
 
     // a message that emulates a node restart
-    public class RecoveryMessage implements Serializable {}
+    public static class RecoveryMessage implements Serializable {}
 
-    public class Node extends AbstractActor {
+    public static class Node extends AbstractActor {
         protected int id;                                           // node ID
         protected List<ActorRef> neighbors;                         // list of neighbor nodes
         protected ActorRef holder;                                  // location of the privilege relative to the node itself
@@ -54,6 +59,10 @@ public class DistributedMutualExclusion {
             adviseReceived = new HashSet<>();
         }
 
+        static public Props props(int id, List<ActorRef> neighbors) {
+            return Props.create(Node.class, () -> new Node(id,neighbors));
+        }
+        
         void assignPrivilege() {
             if (holder.equals(getSelf()) & !using & !requestQ.isEmpty()) {
                 holder = requestQ.remove();
@@ -62,7 +71,8 @@ public class DistributedMutualExclusion {
                     using = true;
                     // TODO: schedule node exits the critical section
                 } else {
-                    holder.tell(new PrivilegeMessage(), getSelf());
+                    Serializable m = new PrivilegeMessage();
+                    holder.tell(m, getSelf());
                 }
             }
         }
@@ -152,5 +162,28 @@ public class DistributedMutualExclusion {
                 makeRequest();
             }
         }
+        
+    }
+    
+    
+    public static void main(String[] args) {
+        // Create the actor system
+        final ActorSystem system = ActorSystem.create("helloakka");
+
+        List<ActorRef> nodes = new ArrayList<>();
+        ArrayList neighbors = new ArrayList<>(); //TODO: Now this is empty but we should define it for every node 
+        for (int i=0; i<N_NODES; i++) {
+            System.out.println("Setting up node " + i);
+            nodes.add(system.actorOf(Node.props(i,neighbors), "Node" + i));
+        }
+
+        //TODO: Define start procedure (INIT) Where a random node is selected and it starts sending init messages
+
+        try {
+          System.out.println(">>> Press ENTER to exit <<<");
+          System.in.read();
+        } 
+        catch (IOException ioe) {}
+        system.terminate();
     }
 }
