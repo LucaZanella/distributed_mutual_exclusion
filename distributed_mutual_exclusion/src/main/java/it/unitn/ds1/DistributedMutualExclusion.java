@@ -4,11 +4,8 @@ import akka.actor.ActorRef;
 import akka.actor.AbstractActor;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
-import akka.actor.Inbox;
-import akka.actor.Cancellable;
 import java.io.IOException;
 import scala.concurrent.duration.Duration;
-import scala.concurrent.duration.FiniteDuration;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -17,12 +14,24 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Collections;
 
 
 public class DistributedMutualExclusion {
     final static int N_NODES= 10;
 
+    /**
+     * Message sent from the main routine to all nodes in order to communicate 
+     * the neighbor list and the identity of the protocol starter
+     */
+    public static class BootstrapMessage implements Serializable {
+        List<ActorRef> neighbors;
+        boolean isStarter;
+        public BootstrapMessage(List<ActorRef> neighbors, boolean isStarter) {
+            this.neighbors = neighbors;
+            this.isStarter = isStarter;
+        }
+    }
+    
     public static class InitializeMessage implements Serializable {}
 
     public static class RequestMessage implements Serializable {}
@@ -33,8 +42,9 @@ public class DistributedMutualExclusion {
 
     public static class AdviseMessage implements Serializable {}
 
-    // a message that emulates a node restart
-    public static class RecoveryMessage implements Serializable {}
+    public static class RecoveryMessage implements Serializable {
+        // a message that emulates a node restart
+    }
 
     public static class Node extends AbstractActor {
         protected int id;                                           // node ID
@@ -46,11 +56,10 @@ public class DistributedMutualExclusion {
         protected boolean isRecovering;                             // indicates if the node is in recovery phase
         protected Set<ActorRef> adviseReceived;                     // set of nodes the node received an ADVISE message from
 
-        public Node(int id, List<ActorRef> neighbors) {
+        public Node(int id) {
             super();
             this.id = id;
-            // TODO: implement a spanning tree of the computer network
-            this.neighbors = neighbors;
+            
             holder = null;
             requestQ = new LinkedList<ActorRef>();
             using = false;
@@ -58,9 +67,22 @@ public class DistributedMutualExclusion {
             isRecovering = false;
             adviseReceived = new HashSet<>();
         }
+        
+        public Node(int id, List<ActorRef> neighbors) {
+            this(id);
+            this.neighbors = neighbors;
+        }
+
+        public void setNeighbors(List<ActorRef> neighbors) {
+            this.neighbors = neighbors;
+        }
 
         static public Props props(int id, List<ActorRef> neighbors) {
             return Props.create(Node.class, () -> new Node(id,neighbors));
+        }
+
+        static public Props props(int id) {
+            return Props.create(Node.class, () -> new Node(id));
         }
         
         void assignPrivilege() {
@@ -108,19 +130,32 @@ public class DistributedMutualExclusion {
         @java.lang.Override
         public Receive createReceive() {
             return receiveBuilder()
-                .match(PrivilegeMessage.class, this::onPrivilegeMessage)
-                .match(RequestMessage.class, this::onRequestMessage)
+                .match(BootstrapMessage.class, this::onBootstrapMessage)
                 .match(InitializeMessage.class, this::onInitializeMessage)
+                .match(RequestMessage.class, this::onRequestMessage)
+                .match(PrivilegeMessage.class, this::onPrivilegeMessage)
+                .match(RestartMessage.class, this::onRestartMessage)
+                .match(AdviseMessage.class, this::onAdviseMessage)
                 .match(RecoveryMessage.class, this::onRecoveryMessage)
                 .build();
         }
+        
+        public void onBootstrapMessage(BootstrapMessage msg) {
+            System.out.println("Received a bootstrap message (Node " + this.id + ") (#Neighbors: " + msg.neighbors.size() + ")");
+            this.neighbors = msg.neighbors;
+            
+            if(msg.isStarter){
+                System.out.println("Node " + this.id  + " is the protocol starter");
+                
+                //TODO: implement starter behaviour
+            }
+        }
 
-        public void onPrivilegeMessage(PrivilegeMessage msg) {
-            holder = self();
-            // procedures assignPrivilege and makeRequest are not called during recovery phase
-            if (isRecovering) return;
-            assignPrivilege();
-            makeRequest();
+        public void onInitializeMessage(InitializeMessage msg) {
+            holder = getSender();
+            for (ActorRef neighbor : neighbors) {
+                neighbor.tell(new InitializeMessage(), getSelf());
+            }
         }
 
         public void onRequestMessage(RequestMessage msg) {
@@ -131,19 +166,12 @@ public class DistributedMutualExclusion {
             makeRequest();
         }
 
-        public void onInitializeMessage(InitializeMessage msg) {
-            holder = getSender();
-            for (ActorRef neighbor : neighbors) {
-                neighbor.tell(new InitializeMessage(), getSelf());
-            }
-        }
-
-        public void onRecoveryMessage(RecoveryMessage msg) {
-            // TODO: delay for a period sufficiently long to ensure that all messages sent by node X before it failed have been received
-            RestartMessage restartMessage = new RestartMessage();
-            for (ActorRef neighbor : neighbors) {
-                neighbor.tell(restartMessage, getSelf());
-            }
+        public void onPrivilegeMessage(PrivilegeMessage msg) {
+            holder = self();
+            // procedures assignPrivilege and makeRequest are not called during recovery phase
+            if (isRecovering) return;
+            assignPrivilege();
+            makeRequest();
         }
 
         public void onRestartMessage(RestartMessage msg) {
@@ -163,22 +191,137 @@ public class DistributedMutualExclusion {
             }
         }
         
+        
+        public void onRecoveryMessage(RecoveryMessage msg) {
+            // TODO: delay for a period sufficiently long to ensure that all messages sent by node X before it failed have been received
+            RestartMessage restartMessage = new RestartMessage();
+            for (ActorRef neighbor : neighbors) {
+                neighbor.tell(restartMessage, getSelf());
+            }
+        }
     }
     
-    
-    public static void main(String[] args) {
-        // Create the actor system
-        final ActorSystem system = ActorSystem.create("helloakka");
-
-        List<ActorRef> nodes = new ArrayList<>();
-        ArrayList neighbors = new ArrayList<>(); //TODO: Now this is empty but we should define it for every node 
-        for (int i=0; i<N_NODES; i++) {
-            System.out.println("Setting up node " + i);
-            nodes.add(system.actorOf(Node.props(i,neighbors), "Node" + i));
+    /**
+     * Creates an ArrayList (nodes) containing ArrayLists for neighbors
+     * @param network 
+     */
+    public static void createStructure(ArrayList<ArrayList<Integer>> network){
+        ArrayList<Integer> n = new ArrayList<>();
+        
+        n.clear();
+        n.add(1);
+        n.add(2);
+        n.add(3);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(0);
+        n.add(4);
+        n.add(9);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(0);
+        n.add(5);
+        n.add(6);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(0);
+        n.add(7);
+        n.add(8);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(1);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(2);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(2);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(3);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(3);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        n.clear();
+        n.add(1);
+        network.add((ArrayList<Integer>)n.clone());
+        
+        /*
+        To check correctness:
+        
+        int i = 0;
+        for(ArrayList a : network){
+            System.out.print("Node " + i + ": ");
+            i++;
+            
+            for(Object v : a){
+                Integer val = (Integer)v;
+                System.out.print("[" + val + "] ");
+            }
+            System.out.println("");
         }
-
-        //TODO: Define start procedure (INIT) Where a random node is selected and it starts sending init messages
-
+        */
+                
+    }
+    
+    /**
+     * Defines the nodes that are part of the networks
+     * @param args 
+     */
+    public static void main(String[] args) {
+        
+        // 1.Create the actor system
+        final ActorSystem system = ActorSystem.create("helloakka");
+        
+        // 2.Instantiate the nodes
+        List<ActorRef> nodes = new ArrayList<>();
+        for(int i = 0; i < N_NODES; i++){
+            nodes.add(system.actorOf(Node.props(i), "node" + i));
+        }
+        
+        // 3.Define the network structure      TODO: Would it be better if we read a csv with the adjacency matrix?
+        ArrayList<ArrayList<Integer>> networkStructure = new ArrayList<>();
+        createStructure(networkStructure);  //Instantiates the neighbor lists and modify @networkStructure
+        
+        // 4. Select the starter
+        int starter = 0;
+        
+        // 5.Tell to the nodes their neighbor lists
+        for(int nodeId = 0; nodeId < N_NODES; nodeId++){
+            // Get the IDs of the neighbors
+            ArrayList<Integer> neighborsId = networkStructure.get(nodeId);  //List of IDs
+            List<ActorRef> neighbors = new ArrayList<>();                   //List of References
+            
+            // For all IDs get the reference from the nodes List and add them to the list
+            for(int neighborId : neighborsId){
+                ActorRef neighborRef = nodes.get(neighborId);
+                neighbors.add(neighborRef);
+            }
+            
+            // Check if current node is the selected starter 
+            boolean isStarter = false;
+            if(nodeId == starter)
+                isStarter = true;
+            
+            // Prepare a message with the neighbor Reference list and start flag
+            BootstrapMessage start = new BootstrapMessage(neighbors,isStarter);
+            // Send the bootstrap message
+            nodes.get(nodeId).tell(start, null);
+        }
+        
+        
+        
+        
         try {
           System.out.println(">>> Press ENTER to exit <<<");
           System.in.read();
@@ -186,4 +329,6 @@ public class DistributedMutualExclusion {
         catch (IOException ioe) {}
         system.terminate();
     }
+    
+    
 }
