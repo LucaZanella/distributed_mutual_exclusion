@@ -60,3 +60,8 @@ nb-configuration.xml
 ##########################
 .DS_Store
 
+##########################
+## Gradle
+##########################
+.gradle/
+/distributed_mutual_exclusion/.nb-gradle
