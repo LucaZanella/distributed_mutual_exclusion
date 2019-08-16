@@ -5,6 +5,7 @@ import akka.actor.AbstractActor;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 import java.io.IOException;
+
 import scala.concurrent.duration.Duration;
 
 import java.io.Serializable;
@@ -21,10 +22,10 @@ public class DistributedMutualExclusion {
     final static int BOOTSTRAP_DELAY= 5000;
     
     static List<ActorRef> nodes; //This is here only for test purposes, TODO: remove when getID is not needed
-    
+
     public static Integer getId(ActorRef mnode){
         Integer res = null;
-        for(int i = 0; i < N_NODES; i++){
+        for(int i = 0; i < N_NODES; i++) {
             ActorRef node = nodes.get(i);
             if(node.equals(mnode)){
                 res = i;
@@ -61,38 +62,18 @@ public class DistributedMutualExclusion {
     }
 
     public static class Node extends AbstractActor {
-        protected int id;                                           // node ID
-        protected List<ActorRef> neighbors;                         // list of neighbor nodes
-        protected ActorRef holder;                                  // location of the privilege relative to the node itself
-        protected LinkedList<ActorRef> requestQ;                    // contains the names of the neighbors that have sent a REQUEST message to the node itself
-        protected boolean using;                                    // indicates if the node is executing the critical section
-        protected boolean asked;                                    // indicates if the node has sent a REQUEST message to the holder
-        protected boolean isRecovering;                             // indicates if the node is in recovery phase
-        protected Set<ActorRef> adviseReceived;                     // set of nodes the node received an ADVISE message from
+        protected int id;                                                       // node ID
+        protected List<ActorRef> neighbors = null;                              // list of neighbor nodes
+        protected ActorRef holder = null;                                       // location of the privilege relative to the node itself
+        protected LinkedList<ActorRef> requestQ = new LinkedList<ActorRef>();   // contains the names of the neighbors that have sent a REQUEST message to the node itself
+        protected boolean using = false;                                        // indicates if the node is executing the critical section
+        protected boolean asked = false;                                        // indicates if the node has sent a REQUEST message to the holder
+        protected boolean isRecovering = false;                                 // indicates if the node is in recovery phase
+        protected Set<ActorRef> adviseReceived = new HashSet<>();               // set of nodes the node received an ADVISE message from
 
         public Node(int id) {
             super();
             this.id = id;
-            
-            holder = null;
-            requestQ = new LinkedList<ActorRef>();
-            using = false;
-            asked = false;
-            isRecovering = false;
-            adviseReceived = new HashSet<>();
-        }
-        
-        public Node(int id, List<ActorRef> neighbors) {
-            this(id);
-            this.neighbors = neighbors;
-        }
-
-        public void setNeighbors(List<ActorRef> neighbors) {
-            this.neighbors = neighbors;
-        }
-
-        static public Props props(int id, List<ActorRef> neighbors) {
-            return Props.create(Node.class, () -> new Node(id,neighbors));
         }
 
         static public Props props(int id) {
@@ -220,78 +201,67 @@ public class DistributedMutualExclusion {
             }
         }
     }
-        
+
+    public static class Graph {
+        ArrayList<ArrayList<Integer>> adj;
+        int V;
+
+        Graph (int V) {
+            this.V = V;
+            adj = new ArrayList<ArrayList<Integer>>(V);
+            for (int i = 0; i < V; i++) {
+                adj.add(new ArrayList<Integer>());
+            }
+        }
+
+        void addEdge(int u, int v) {
+            adj.get(u).add(v);
+            adj.get(v).add(u);
+        }
+
+        ArrayList<Integer> getAdjacencyList(int u) {
+            return adj.get(u);
+        }
+
+        void printAdjacencyList() {
+            for (int i = 0; i < adj.size(); i++) {
+                System.out.println("Adjacency list of " + i + ": ");
+                for (int j = 0; j < adj.get(i).size(); j++) {
+                    System.out.print(adj.get(i).get(j) + " ");
+                }
+                System.out.println();
+            }
+        }
+    }
+
     /**
      * Creates an ArrayList (nodes) containing ArrayLists for neighbors
-     * @param network 
      */
-    public static void createStructure(ArrayList<ArrayList<Integer>> network){
-        ArrayList<Integer> n = new ArrayList<>();
-        
-        n.clear();
-        n.add(1);
-        n.add(2);
-        n.add(3);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(0);
-        n.add(4);
-        n.add(9);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(0);
-        n.add(5);
-        n.add(6);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(0);
-        n.add(7);
-        n.add(8);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(1);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(2);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(2);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(3);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(3);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        n.clear();
-        n.add(1);
-        network.add((ArrayList<Integer>)n.clone());
-        
-        /*
-        To check correctness:
-        
-        int i = 0;
-        for(ArrayList a : network){
-            System.out.print("Node " + i + ": ");
-            i++;
-            
-            for(Object v : a){
-                Integer val = (Integer)v;
-                System.out.print("[" + val + "] ");
-            }
-            System.out.println("");
-        }
-        */
-                
+    public static Graph createStructure() {
+        // Creating graph with N_NODES vertices
+        Graph g = new Graph(N_NODES);
+
+        // Adding edges one by one
+        g.addEdge(0, 1);
+        g.addEdge(0, 2);
+        g.addEdge(0, 3);
+        g.addEdge(1, 0);
+        g.addEdge(1, 4);
+        g.addEdge(1, 9);
+        g.addEdge(2, 0);
+        g.addEdge(2, 5);
+        g.addEdge(2, 6);
+        g.addEdge(3, 0);
+        g.addEdge(3, 7);
+        g.addEdge(3, 8);
+        g.addEdge(4, 1);
+        g.addEdge(5, 2);
+        g.addEdge(6, 2);
+        g.addEdge(7, 3);
+        g.addEdge(8, 3);
+        g.addEdge(9, 1);
+
+        return g;
     }
     
     /**
@@ -304,49 +274,45 @@ public class DistributedMutualExclusion {
         final ActorSystem system = ActorSystem.create("helloakka");
         
         // 2.Instantiate the nodes
-        nodes = new ArrayList<>();
-        for(int i = 0; i < N_NODES; i++){
+        List<ActorRef> nodes = new ArrayList<>();
+        for (int i = 0; i < N_NODES; i++) {
             nodes.add(system.actorOf(Node.props(i), "node" + i));
         }
         
         // 3.Define the network structure      TODO: Would it be better if we read a csv with the adjacency matrix?
-        ArrayList<ArrayList<Integer>> networkStructure = new ArrayList<>();
-        createStructure(networkStructure);  //Instantiates the neighbor lists and modify @networkStructure
-        
-        // 4. Select the starter
+        Graph g = createStructure();  // Instantiates the neighbor lists and modify @networkStructure
+        g.printAdjacencyList();
+
+        // 4.Select the starter
         int starter = 0;
         
         // 5.Tell to the nodes their neighbor lists
-        for(int nodeId = 0; nodeId < N_NODES; nodeId++){
+        for (int nodeId = 0; nodeId < N_NODES; nodeId++) {
             // Get the IDs of the neighbors
-            ArrayList<Integer> neighborsId = networkStructure.get(nodeId);  //List of IDs
-            List<ActorRef> neighbors = new ArrayList<>();                   //List of References
-            
-            // For all IDs get the reference from the nodes List and add them to the list
-            for(int neighborId : neighborsId){
-                ActorRef neighborRef = nodes.get(neighborId);
-                neighbors.add(neighborRef);
+            ArrayList<Integer> neighborsId = g.getAdjacencyList(nodeId);    // List of neighbors ID
+            List<ActorRef> neighbors = new ArrayList<>();                   // List of neighbors
+
+            for (int neighborId : neighborsId) {
+                ActorRef neighbor = nodes.get(neighborId);
+                neighbors.add(neighbor);
+            }
+
+            // Check if current node is the selected starter
+            boolean isStarter = false;
+            if (nodeId == starter) {
+                isStarter = true;
             }
             
-            // Check if current node is the selected starter 
-            boolean isStarter = false;
-            if(nodeId == starter)
-                isStarter = true;
-            
             // Prepare a message with the neighbor Reference list and start flag
-            BootstrapMessage start = new BootstrapMessage(neighbors,isStarter);
+            BootstrapMessage start = new BootstrapMessage(neighbors, isStarter);
             // Send the bootstrap message
             nodes.get(nodeId).tell(start, null);
         }
-        
-        
-        
-        
+
         try {
-          System.out.println(">>> Press ENTER to exit <<<");
-          System.in.read();
-        } 
-        catch (IOException ioe) {}
+            System.out.println(">>> Press ENTER to exit <<<");
+            System.in.read();
+        } catch (IOException ioe) {}
         system.terminate();
     }
     
