@@ -152,7 +152,10 @@ public class DistributedMutualExclusion {
         }
 
         public void onInitializeMessage(InitializeMessage msg) {
-            System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + getId(getSender()));
+            ActorRef sender = getSender();
+            if(sender == null)
+                System.err.println("Issue here");
+            System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + getId(sender));
             holder = getSender();
             for (ActorRef neighbor : neighbors) 
                 if(neighbor != holder)
@@ -265,7 +268,7 @@ public class DistributedMutualExclusion {
         final ActorSystem system = ActorSystem.create("helloakka");
         
         // 2.Instantiate the nodes
-        List<ActorRef> nodes = new ArrayList<>();
+        nodes = new ArrayList<>();
         for (int i = 0; i < N_NODES; i++) {
             nodes.add(system.actorOf(Node.props(i), "node" + i));
         }
