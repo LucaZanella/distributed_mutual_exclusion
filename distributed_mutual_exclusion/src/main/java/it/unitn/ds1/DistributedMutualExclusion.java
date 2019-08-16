@@ -18,6 +18,20 @@ import java.util.List;
 
 public class DistributedMutualExclusion {
     final static int N_NODES= 10;
+    final static int BOOTSTRAP_DELAY= 5000;
+    
+    static List<ActorRef> nodes; //This is here only for test purposes, TODO: remove when getID is not needed
+    
+    public static Integer getId(ActorRef mnode){
+        Integer res = null;
+        for(int i = 0; i < N_NODES; i++){
+            ActorRef node = nodes.get(i);
+            if(node.equals(mnode)){
+                res = i;
+            }
+        }
+        return res;
+    }
 
     /**
      * Message sent from the main routine to all nodes in order to communicate 
@@ -110,9 +124,14 @@ public class DistributedMutualExclusion {
         }
 
         void initialize() {
-            for (ActorRef neighbor : neighbors) {
-                neighbor.tell(new InitializeMessage(), getSelf());
-            }
+            // We only schedule an init message to the starter itself to account
+            //for setup time
+            getContext().system().scheduler().scheduleOnce(
+                Duration.create(BOOTSTRAP_DELAY, TimeUnit.MILLISECONDS),  
+                getSelf(),
+                new InitializeMessage(),
+                getContext().system().dispatcher(), getSelf()
+                );
         }
 
         // emulate a crash and a recovery in a given time
@@ -147,15 +166,17 @@ public class DistributedMutualExclusion {
             if(msg.isStarter){
                 System.out.println("Node " + this.id  + " is the protocol starter");
                 
-                //TODO: implement starter behaviour
+                initialize();
             }
         }
 
         public void onInitializeMessage(InitializeMessage msg) {
+            System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + getId(getSender()));
             holder = getSender();
-            for (ActorRef neighbor : neighbors) {
-                neighbor.tell(new InitializeMessage(), getSelf());
-            }
+            for (ActorRef neighbor : neighbors) 
+                if(neighbor != holder)
+                    neighbor.tell(new InitializeMessage(), getSelf());
+            
         }
 
         public void onRequestMessage(RequestMessage msg) {
@@ -191,7 +212,6 @@ public class DistributedMutualExclusion {
             }
         }
         
-        
         public void onRecoveryMessage(RecoveryMessage msg) {
             // TODO: delay for a period sufficiently long to ensure that all messages sent by node X before it failed have been received
             RestartMessage restartMessage = new RestartMessage();
@@ -200,7 +220,7 @@ public class DistributedMutualExclusion {
             }
         }
     }
-    
+        
     /**
      * Creates an ArrayList (nodes) containing ArrayLists for neighbors
      * @param network 
@@ -284,7 +304,7 @@ public class DistributedMutualExclusion {
         final ActorSystem system = ActorSystem.create("helloakka");
         
         // 2.Instantiate the nodes
-        List<ActorRef> nodes = new ArrayList<>();
+        nodes = new ArrayList<>();
         for(int i = 0; i < N_NODES; i++){
             nodes.add(system.actorOf(Node.props(i), "node" + i));
         }
