@@ -4,10 +4,13 @@ import akka.actor.ActorRef;
 import akka.actor.AbstractActor;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
+
+import java.io.BufferedReader;
 import java.io.IOException;
 
 import scala.concurrent.duration.Duration;
 
+import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -16,11 +19,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.LinkedList;
 import java.util.List;
 
-
 public class DistributedMutualExclusion {
     final static int N_NODES= 10;
     final static int BOOTSTRAP_DELAY= 5000;
-    
+    final static int REQUEST_COMMAND = 0;
+    final static int CRASH_COMMAND = 1;
+
     static List<ActorRef> nodes; //This is here only for test purposes, TODO: remove when getID is not needed
 
     public static Integer getId(ActorRef mnode){
@@ -59,6 +63,13 @@ public class DistributedMutualExclusion {
 
     public static class RecoveryMessage implements Serializable {
         // a message that emulates a node restart
+    }
+
+    public static class UserInputMessage implements Serializable {
+        protected int commandId;
+        public UserInputMessage(int commandId) {
+            this.commandId = commandId;
+        }
     }
 
     public static class Node extends AbstractActor {
@@ -137,6 +148,7 @@ public class DistributedMutualExclusion {
                 .match(RestartMessage.class, this::onRestartMessage)
                 .match(AdviseMessage.class, this::onAdviseMessage)
                 .match(RecoveryMessage.class, this::onRecoveryMessage)
+                .match(UserInputMessage.class, this::onUserInputMessage)
                 .build();
         }
         
@@ -203,6 +215,18 @@ public class DistributedMutualExclusion {
                 neighbor.tell(restartMessage, getSelf());
             }
         }
+
+        public void onUserInputMessage(UserInputMessage msg) {
+            switch (msg.commandId) {
+                case REQUEST_COMMAND:
+                    assignPrivilege();
+                    makeRequest();
+                    break;
+                case CRASH_COMMAND:
+                    // TODO: decide if recoverIn should be passed by the user or not
+                    crash(5000);
+            }
+        }
     }
 
     public static class Graph {
@@ -262,8 +286,8 @@ public class DistributedMutualExclusion {
      * Defines the nodes that are part of the networks
      * @param args 
      */
-    public static void main(String[] args) {
-        
+    public static void main(String[] args) throws IOException {
+
         // 1.Create the actor system
         final ActorSystem system = ActorSystem.create("helloakka");
         
@@ -303,10 +327,47 @@ public class DistributedMutualExclusion {
             nodes.get(nodeId).tell(start, null);
         }
 
-        try {
-            System.out.println(">>> Press ENTER to exit <<<");
-            System.in.read();
-        } catch (IOException ioe) {}
+        //Enter data using BufferReader
+        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+        String out = "Enter:\n" +
+                "- 'r' to send a request\n" +
+                "- 'c' to crash a node\n" +
+                "- 'q' to quit\n" +
+                "Your choice:";
+        System.out.println(out);
+        String user_input = in.readLine();
+
+        while (!user_input.equals("q")) {
+            if (user_input.equals("r") | user_input.equals("c")) {
+                System.out.println("Enter the node's ID:");
+                while (true) {
+                    try {
+                        int nodeID = Integer.parseInt(in.readLine());
+                        if (nodeID >= N_NODES) {
+                            System.out.println("Node's ID must be between 0 and " + (N_NODES - 1) + "\n." +
+                                    "Please enter a new value:");
+                        }
+                        UserInputMessage msg;
+                        if (user_input.equals("r")) {
+                            msg = new UserInputMessage(REQUEST_COMMAND);
+                        } else if (user_input.equals("c")) {
+                            msg = new UserInputMessage(CRASH_COMMAND);
+                        } else {
+                            throw new IllegalArgumentException("Unknown command");
+                        }
+                        nodes.get(nodeID).tell(msg, null);
+                    } catch (NumberFormatException ex) {
+                        System.out.println("Wrong node's ID format. Please enter an integer value:");
+                        continue;
+                    }
+                }
+            } else {
+                System.out.println("Unknown command. Please try again");
+            }
+            System.out.println("\n" + out);
+            user_input = in.readLine();
+        }
+        in.close();
         system.terminate();
     }
     
