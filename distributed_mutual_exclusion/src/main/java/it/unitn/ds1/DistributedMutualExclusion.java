@@ -21,44 +21,63 @@ public class DistributedMutualExclusion {
     final static int N_NODES= 10;
     final static int BOOTSTRAP_DELAY= 5000;
     
-    static List<ActorRef> nodes; //This is here only for test purposes, TODO: remove when getID is not needed
-
-    public static Integer getId(ActorRef mnode){
-        Integer res = null;
-        for(int i = 0; i < N_NODES; i++) {
-            ActorRef node = nodes.get(i);
-            if(node.equals(mnode)){
-                res = i;
-            }
+    public static class Message implements Serializable {
+        Integer senderId;
+        public Message(Integer senderId) {
+            this.senderId = senderId;
         }
-        return res;
     }
-
+    
     /**
      * Message sent from the main routine to all nodes in order to communicate 
      * the neighbor list and the identity of the protocol starter
      */
-    public static class BootstrapMessage implements Serializable {
+    public static class BootstrapMessage extends Message implements Serializable{
         List<ActorRef> neighbors;
         boolean isStarter;
         public BootstrapMessage(List<ActorRef> neighbors, boolean isStarter) {
+            //Bootstrap message is sent only by the main routine and not from 
+            //specific nodes
+            super(null);
             this.neighbors = neighbors;
             this.isStarter = isStarter;
         }
     }
     
-    public static class InitializeMessage implements Serializable {}
+    public static class InitializeMessage extends Message implements Serializable {
+        public InitializeMessage(Integer senderId) {
+            super(senderId);
+        }
+    }
 
-    public static class RequestMessage implements Serializable {}
+    public static class RequestMessage extends Message implements Serializable {
+        public RequestMessage(Integer senderId) {
+            super(senderId);
+        }
+    }
 
-    public static class PrivilegeMessage implements Serializable {}
+    public static class PrivilegeMessage extends Message implements Serializable {
+        public PrivilegeMessage(Integer senderId) {
+            super(senderId);
+        }
+    }
 
-    public static class RestartMessage implements Serializable {}
+    public static class RestartMessage extends Message implements Serializable {
+        public RestartMessage(Integer senderId) {
+            super(senderId);
+        }
+    }
 
-    public static class AdviseMessage implements Serializable {}
+    public static class AdviseMessage extends Message implements Serializable {
+        public AdviseMessage(Integer senderId) {
+            super(senderId);
+        }
+    }
 
-    public static class RecoveryMessage implements Serializable {
-        // a message that emulates a node restart
+    public static class RecoveryMessage extends Message implements Serializable {
+        public RecoveryMessage(Integer senderId) {
+            super(senderId);
+        }
     }
 
     public static class Node extends AbstractActor {
@@ -88,7 +107,7 @@ public class DistributedMutualExclusion {
                     using = true;
                     // TODO: schedule node exits the critical section
                 } else {
-                    Serializable m = new PrivilegeMessage();
+                    Serializable m = new PrivilegeMessage(this.id);
                     holder.tell(m, getSelf());
                 }
             }
@@ -99,7 +118,7 @@ public class DistributedMutualExclusion {
             if (holder == null) return;
 
             if (holder != getSelf() & !requestQ.isEmpty() & !asked) {
-                holder.tell(new RequestMessage(), getSelf());
+                holder.tell(new RequestMessage(this.id), getSelf());
                 asked = true;
             }
         }
@@ -110,7 +129,7 @@ public class DistributedMutualExclusion {
             getContext().system().scheduler().scheduleOnce(
                 Duration.create(BOOTSTRAP_DELAY, TimeUnit.MILLISECONDS),  
                 getSelf(),
-                new InitializeMessage(),
+                new InitializeMessage(this.id),
                 getContext().system().dispatcher(), getSelf()
                 );
         }
@@ -122,7 +141,7 @@ public class DistributedMutualExclusion {
             getContext().system().scheduler().scheduleOnce(
                 Duration.create(recoverIn, TimeUnit.MILLISECONDS),
                 getSelf(),
-                new RecoveryMessage(), // message sent to myself
+                new RecoveryMessage(this.id), // message sent to myself
                 getContext().system().dispatcher(), getSelf()
             );
         }
@@ -155,11 +174,11 @@ public class DistributedMutualExclusion {
             ActorRef sender = getSender();
             if(sender == null)
                 System.err.println("Issue here");
-            System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + getId(sender));
+            System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + msg.senderId);
             holder = getSender();
             for (ActorRef neighbor : neighbors) 
                 if(neighbor != holder)
-                    neighbor.tell(new InitializeMessage(), getSelf());
+                    neighbor.tell(new InitializeMessage(this.id), getSelf());
             
         }
 
@@ -198,7 +217,7 @@ public class DistributedMutualExclusion {
         
         public void onRecoveryMessage(RecoveryMessage msg) {
             // TODO: delay for a period sufficiently long to ensure that all messages sent by node X before it failed have been received
-            RestartMessage restartMessage = new RestartMessage();
+            RestartMessage restartMessage = new RestartMessage(this.id);
             for (ActorRef neighbor : neighbors) {
                 neighbor.tell(restartMessage, getSelf());
             }
@@ -228,11 +247,13 @@ public class DistributedMutualExclusion {
 
         void printAdjacencyList() {
             for (int i = 0; i < adj.size(); i++) {
-                System.out.println("Adjacency list of " + i + ": ");
+                System.out.print("Adjacency list of " + i + ": [");
                 for (int j = 0; j < adj.get(i).size(); j++) {
-                    System.out.print(adj.get(i).get(j) + " ");
+                    System.out.print(adj.get(i).get(j));
+                    if(j != adj.get(i).size()-1)
+                        System.out.print(", ");
                 }
-                System.out.println();
+                System.out.println("]");
             }
         }
     }
@@ -268,7 +289,7 @@ public class DistributedMutualExclusion {
         final ActorSystem system = ActorSystem.create("helloakka");
         
         // 2.Instantiate the nodes
-        nodes = new ArrayList<>();
+        List<ActorRef> nodes = new ArrayList<>();
         for (int i = 0; i < N_NODES; i++) {
             nodes.add(system.actorOf(Node.props(i), "node" + i));
         }
