@@ -239,10 +239,12 @@ public class DistributedMutualExclusion {
         public void onUserInputMessage(UserInputMessage msg) {
             switch (msg.commandId) {
                 case REQUEST_COMMAND:
+                    System.out.println("<<INPUT.MSG> Received REQUEST command (node " + this.id + ")");
                     assignPrivilege();
                     makeRequest();
                     break;
                 case CRASH_COMMAND:
+                    System.out.println("<<INPUT.MSG> Received CRASH command (node " + this.id + ")");
                     // TODO: decide if recoverIn should be passed by the user or not
                     crash(5000);
             }
@@ -349,49 +351,53 @@ public class DistributedMutualExclusion {
             nodes.get(nodeId).tell(start, null);
         }
 
-        //Enter data using BufferReader
+        
+        // 6.Handle command line input
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
-        String out = "Enter:\n" +
+        boolean close = false;
+        do{
+            String out = "Enter:\n" +
                 "- 'r' to send a request\n" +
                 "- 'c' to crash a node\n" +
                 "- 'q' to quit\n" +
                 "Your choice:";
-        System.out.println(out);
-        String user_input = in.readLine();
-
-        while (!user_input.equals("q")) {
-            if (user_input.equals("r") | user_input.equals("c")) {
+            System.out.println(out);
+            String user_input = in.readLine();
+            if(user_input.equals("q")){
+                close = true;
+            }else if (user_input.equals("r") | user_input.equals("c")) {
+                
                 System.out.println("Enter the node's ID:");
-                while (true) {
+                boolean read_number = true;
+                while (read_number) {
                     try {
                         int nodeID = Integer.parseInt(in.readLine());
-                        if (nodeID >= N_NODES) {
-                            System.out.println("Node's ID must be between 0 and " + (N_NODES - 1) + "\n." +
-                                    "Please enter a new value:");
+                        
+                        if (!(nodeID < N_NODES && nodeID >= 0)) {
+                            throw new NumberFormatException();
                         }
-                        UserInputMessage msg;
+                        
+                        UserInputMessage msg = null;
                         if (user_input.equals("r")) {
+                            System.out.println("REQUEST instruction issued to node " + nodeID);
                             msg = new UserInputMessage(REQUEST_COMMAND);
                         } else if (user_input.equals("c")) {
+                            System.out.println("CRASH instruction issued to node " + nodeID);
                             msg = new UserInputMessage(CRASH_COMMAND);
-                        } else {
-                            throw new IllegalArgumentException("Unknown command");
                         }
+                        
                         nodes.get(nodeID).tell(msg, null);
+                        read_number = false;
+                        
                     } catch (NumberFormatException ex) {
-                        System.out.println("Wrong node's ID format. Please enter an integer value:");
-                        continue;
+                        System.out.println("Incorrect ID number. Please enter an integer value between 0 and " + N_NODES);
                     }
                 }
             } else {
                 System.out.println("Unknown command. Please try again");
             }
-            System.out.println("\n" + out);
-            user_input = in.readLine();
-        }
+        }while(!close);
         in.close();
         system.terminate();
     }
-    
-    
 }
