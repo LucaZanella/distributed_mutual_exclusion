@@ -13,6 +13,7 @@ import scala.concurrent.duration.Duration;
 import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +25,7 @@ public class DistributedMutualExclusion {
     final static int N_NODES = 10;
     final static int BOOTSTRAP_DELAY = 200 * N_NODES;
     final static int CRITICAL_SECTION_TIME = 5000;
+    final static int CRASH_TIME = 5000;
 
     final static int REQUEST_COMMAND = 0;
     final static int CRASH_COMMAND = 1;
@@ -85,14 +87,19 @@ public class DistributedMutualExclusion {
 
     public static class AdviseMessage extends Message implements Serializable {
 
-        public AdviseMessage(Integer senderId) {
+        boolean isXHolder;
+        boolean isXInRequestQ;
+
+        public AdviseMessage(boolean isXHolder, boolean isXInRequestQ, Integer senderId) {
             super(senderId);
+            this.isXHolder = isXHolder;
+            this.isXInRequestQ = isXInRequestQ;
         }
     }
 
-    public static class RecoveryMessage extends Message implements Serializable {
+    public static class Recovery extends Message implements Serializable {
 
-        public RecoveryMessage(Integer senderId) {
+        public Recovery(Integer senderId) {
             super(senderId);
         }
     }
@@ -115,10 +122,10 @@ public class DistributedMutualExclusion {
         protected List<ActorRef> neighbors = null;                              // list of neighbor nodes
         protected ActorRef holder = null;                                       // location of the privilege relative to the node itself
         protected LinkedList<ActorRef> requestQ = new LinkedList<ActorRef>();   // contains the names of the neighbors that have sent a REQUEST message to the node itself
-        protected boolean using = false;                                        // indicates if the node is executing the critical section
-        protected boolean asked = false;                                        // indicates if the node has sent a REQUEST message to the holder
-        protected boolean isRecovering = false;                                 // indicates if the node is in recovery phase
-        protected Set<ActorRef> adviseReceived = new HashSet<>();               // set of nodes the node received an ADVISE message from
+        protected Boolean using = false;                                        // indicates if the node is executing the critical section
+        protected Boolean asked = false;                                        // indicates if the node has sent a REQUEST message to the holder
+        protected Boolean isRecovering = false;                                 // indicates if the node is in recovery phase
+        protected HashMap<ActorRef,AdviseMessage> adviseMessages = new HashMap<>();
 
         public Node(int id) {
             super();
@@ -178,10 +185,16 @@ public class DistributedMutualExclusion {
         void crash(int recoverIn) {
             System.out.println("CRASH!!!");
             // setting a timer to "recover"
-            getContext().system().scheduler().scheduleOnce(
-                    Duration.create(recoverIn, TimeUnit.MILLISECONDS),
+
+            //TODO: See what variables we lose oltre a queste
+            this.holder = null;
+            this.using = null;
+            this.asked = null;
+            this.requestQ.clear();
+            
+            getContext().system().scheduler().scheduleOnce(Duration.create(recoverIn, TimeUnit.MILLISECONDS),
                     getSelf(),
-                    new RecoveryMessage(this.id), // message sent to myself
+                    new Recovery(this.id), // message sent to myself
                     getContext().system().dispatcher(), getSelf()
             );
         }
@@ -195,7 +208,7 @@ public class DistributedMutualExclusion {
                     .match(PrivilegeMessage.class, this::onPrivilegeMessage)
                     .match(RestartMessage.class, this::onRestartMessage)
                     .match(AdviseMessage.class, this::onAdviseMessage)
-                    .match(RecoveryMessage.class, this::onRecoveryMessage)
+                    .match(Recovery.class, this::onRecovery)
                     .match(UserInputMessage.class, this::onUserInputMessage)
                     .match(ExitCriticalSection.class, this::onExitCriticalSection)
                     .build();
@@ -203,6 +216,7 @@ public class DistributedMutualExclusion {
 
         public void onBootstrapMessage(BootstrapMessage msg) {
             System.out.println("Received a bootstrap message (Node " + this.id + ") (#Neighbors: " + msg.neighbors.size() + ")");
+
             this.neighbors = msg.neighbors;
 
             if (msg.isStarter) {
@@ -213,11 +227,12 @@ public class DistributedMutualExclusion {
         }
 
         public void onInitializeMessage(InitializeMessage msg) {
+            System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + msg.senderId);
+
             ActorRef sender = getSender();
             if (sender == null) {
                 System.err.println("Issue here");
             }
-            System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + msg.senderId);
             holder = getSender();
             for (ActorRef neighbor : neighbors) {
                 if (neighbor != holder) {
@@ -232,11 +247,10 @@ public class DistributedMutualExclusion {
 
             requestQ.add(getSender());
             // procedures assignPrivilege and makeRequest are not called during recovery phase
-            if (isRecovering) {
-                return;
+            if (!isRecovering) {
+                assignPrivilege();
+                makeRequest();
             }
-            assignPrivilege();
-            makeRequest();
         }
 
         public void onPrivilegeMessage(PrivilegeMessage msg) {
@@ -244,35 +258,56 @@ public class DistributedMutualExclusion {
 
             holder = self();
             // procedures assignPrivilege and makeRequest are not called during recovery phase
-            if (isRecovering) {
-                return;
-            }
-            assignPrivilege();
-            makeRequest();
-        }
-
-        public void onRestartMessage(RestartMessage msg) {
-            // TODO: send and ADVISE message informing the recovering node of the state of the relationship with the current node
-        }
-
-        public void onAdviseMessage(AdviseMessage msg) {
-            adviseReceived.add(getSender());
-            // the node is in recovery phase until all ADVISE messages from each neighbor are received
-            if (adviseReceived.containsAll(neighbors)) {
-                // TODO: determining holder, asked and reconstruct requestQ
-                adviseReceived.clear();
-                isRecovering = false;
-                // After the recovery phase is completed, the node recommence its participation in the algorithm
+            if (!isRecovering) {
                 assignPrivilege();
                 makeRequest();
             }
         }
 
-        public void onRecoveryMessage(RecoveryMessage msg) {
-            // TODO: delay for a period sufficiently long to ensure that all messages sent by node X before it failed have been received
-            RestartMessage restartMessage = new RestartMessage(this.id);
-            for (ActorRef neighbor : neighbors) {
-                neighbor.tell(restartMessage, getSelf());
+        public void onRestartMessage(RestartMessage msg) {
+            System.out.println("<<REST.MSG>> Node " + this.id + " received from " + msg.senderId);
+
+            // DONE: send and ADVISE message informing the recovering node of the state of the relationship with the current node
+            
+            boolean isXInRequestQ = this.requestQ.contains(getSender());
+            boolean isXHolder = this.holder == getSender();
+            getSender().tell(new AdviseMessage(isXHolder, isXInRequestQ, id), getSelf());
+        }
+
+        public void onAdviseMessage(AdviseMessage msg) {
+            System.out.println("<<ADV.MSG>> Node " + this.id + " received from " + msg.senderId);
+
+            adviseMessages.put(getSender(), msg);
+                        
+            // the node is in recovery phase until all ADVISE messages from each neighbor are received
+            if (adviseMessages.keySet().containsAll(neighbors)) {
+                // All advise messages have been received
+                // Recovery procedure
+                
+                // 1.determining holder, ASKED and USING
+                this.using = false;
+                this.holder = getSelf();
+                asked = false;
+                for(ActorRef neighbor : adviseMessages.keySet()){
+                    AdviseMessage currentMsg = adviseMessages.get(neighbor);
+                    
+                    if(!currentMsg.isXHolder){
+                        // It means that THIS node is not privileged
+                        this.holder = neighbor;
+                        if(currentMsg.isXInRequestQ)
+                            this.asked = true;
+                    }
+                
+                }
+                
+                // 2. Reconstruct Request Queue
+                // TODO: DO IT NOW, JUST DO IT
+                        
+                adviseMessages.clear();
+                isRecovering = false;
+                // After the recovery phase is completed, the node recommence its participation in the algorithm
+                assignPrivilege();
+                makeRequest();
             }
         }
 
@@ -286,8 +321,7 @@ public class DistributedMutualExclusion {
                     break;
                 case CRASH_COMMAND:
                     System.out.println("<<INPUT.MSG> Received CRASH command (node " + this.id + ")");
-                    // TODO: decide if recoverIn should be passed by the user or not
-                    crash(5000);
+                    crash(CRASH_TIME);
                     break;
             }
         }
@@ -298,6 +332,20 @@ public class DistributedMutualExclusion {
             this.using = false;
             assignPrivilege();
             makeRequest();
+        }
+
+        public void onRecovery(Recovery msg) {
+            System.out.println("(Node " + this.id + ")Recovery from crash...");
+
+            /* We assume that the crash lasts long enough to guarantee that all
+             * messages sent before crashing are received by all nodes.
+             * TODO: check if we need to wait for messages to be received
+             */
+            this.isRecovering = true;
+            RestartMessage restartMessage = new RestartMessage(this.id);
+            for (ActorRef neighbor : neighbors) {
+                neighbor.tell(restartMessage, getSelf());
+            }
         }
     }
 
