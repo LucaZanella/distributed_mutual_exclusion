@@ -20,8 +20,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class DistributedMutualExclusion {
-    final static int N_NODES= 10;
-    final static int BOOTSTRAP_DELAY= 5000;
+    final static int N_NODES = 10;
+    final static int BOOTSTRAP_DELAY = 5000;
     
     final static int REQUEST_COMMAND = 0;
     final static int CRASH_COMMAND = 1;
@@ -240,6 +240,7 @@ public class DistributedMutualExclusion {
             switch (msg.commandId) {
                 case REQUEST_COMMAND:
                     System.out.println("<<INPUT.MSG> Received REQUEST command (node " + this.id + ")");
+                    requestQ.add(self());
                     assignPrivilege();
                     makeRequest();
                     break;
@@ -247,6 +248,7 @@ public class DistributedMutualExclusion {
                     System.out.println("<<INPUT.MSG> Received CRASH command (node " + this.id + ")");
                     // TODO: decide if recoverIn should be passed by the user or not
                     crash(5000);
+                    break;
             }
         }
     }
@@ -355,48 +357,47 @@ public class DistributedMutualExclusion {
         // 6.Handle command line input
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         boolean close = false;
-        do{
-            String out = "Enter:\n" +
+        String out = "Enter:\n" +
                 "- 'r' to send a request\n" +
                 "- 'c' to crash a node\n" +
                 "- 'q' to quit\n" +
                 "Your choice:";
+
+        do {
             System.out.println(out);
-            String user_input = in.readLine();
-            if(user_input.equals("q")){
+
+            String userInput = in.readLine();
+            if (userInput.equals("q")) {
                 close = true;
-            }else if (user_input.equals("r") | user_input.equals("c")) {
-                
+            } else if (userInput.equals("r") | userInput.equals("c")) {
                 System.out.println("Enter the node's ID:");
-                boolean read_number = true;
-                while (read_number) {
+
+                boolean readValidNumber = false;
+                while (!readValidNumber) {
                     try {
                         int nodeID = Integer.parseInt(in.readLine());
-                        
-                        if (!(nodeID < N_NODES && nodeID >= 0)) {
-                            throw new NumberFormatException();
+                        if (!(nodeID < N_NODES & nodeID >= 0)) {
+                            throw new IllegalArgumentException();
                         }
-                        
+                        readValidNumber = true;
+
                         UserInputMessage msg = null;
-                        if (user_input.equals("r")) {
+                        if (userInput.equals("r")) {
                             System.out.println("REQUEST instruction issued to node " + nodeID);
                             msg = new UserInputMessage(REQUEST_COMMAND);
-                        } else if (user_input.equals("c")) {
+                        } else if (userInput.equals("c")) {
                             System.out.println("CRASH instruction issued to node " + nodeID);
                             msg = new UserInputMessage(CRASH_COMMAND);
                         }
-                        
                         nodes.get(nodeID).tell(msg, null);
-                        read_number = false;
-                        
-                    } catch (NumberFormatException ex) {
-                        System.out.println("Incorrect ID number. Please enter an integer value between 0 and " + N_NODES);
+                    } catch (IllegalArgumentException ex) {
+                        System.out.println("Incorrect ID number. Please enter an integer value between 0 and " + (N_NODES - 1));
                     }
                 }
             } else {
                 System.out.println("Unknown command. Please try again");
             }
-        }while(!close);
+        } while (!close);
         in.close();
         system.terminate();
     }
