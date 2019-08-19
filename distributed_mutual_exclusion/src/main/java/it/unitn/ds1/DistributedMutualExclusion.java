@@ -89,11 +89,13 @@ public class DistributedMutualExclusion {
 
         boolean isXHolder;
         boolean isXInRequestQ;
+        boolean askedY;
 
-        public AdviseMessage(boolean isXHolder, boolean isXInRequestQ, Integer senderId) {
+        public AdviseMessage(boolean isXHolder, boolean isXInRequestQ, boolean askedY, Integer senderId) {
             super(senderId);
             this.isXHolder = isXHolder;
             this.isXInRequestQ = isXInRequestQ;
+            this.askedY = askedY;
         }
     }
 
@@ -271,7 +273,8 @@ public class DistributedMutualExclusion {
             
             boolean isXInRequestQ = this.requestQ.contains(getSender());
             boolean isXHolder = this.holder == getSender();
-            getSender().tell(new AdviseMessage(isXHolder, isXInRequestQ, id), getSelf());
+
+            getSender().tell(new AdviseMessage(isXHolder, isXInRequestQ, asked, id), getSelf());
         }
 
         public void onAdviseMessage(AdviseMessage msg) {
@@ -288,21 +291,22 @@ public class DistributedMutualExclusion {
                 this.using = false;
                 this.holder = getSelf();
                 asked = false;
-                for(ActorRef neighbor : adviseMessages.keySet()){
+                for (ActorRef neighbor : adviseMessages.keySet()) {
                     AdviseMessage currentMsg = adviseMessages.get(neighbor);
                     
-                    if(!currentMsg.isXHolder){
+                    if (!currentMsg.isXHolder) {
                         // It means that THIS node is not privileged
                         this.holder = neighbor;
-                        if(currentMsg.isXInRequestQ)
+                        if (currentMsg.isXInRequestQ)
                             this.asked = true;
+                    } else {
+                        // 2. Reconstruct Request Queue
+                        if (currentMsg.askedY) {
+                            requestQ.add(neighbor);
+                        }
                     }
-                
                 }
-                
-                // 2. Reconstruct Request Queue
-                // TODO: DO IT NOW, JUST DO IT
-                        
+
                 adviseMessages.clear();
                 isRecovering = false;
                 // After the recovery phase is completed, the node recommence its participation in the algorithm
