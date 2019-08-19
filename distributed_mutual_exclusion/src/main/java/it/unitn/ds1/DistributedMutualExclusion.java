@@ -21,7 +21,8 @@ import java.util.List;
 
 public class DistributedMutualExclusion {
     final static int N_NODES = 10;
-    final static int BOOTSTRAP_DELAY = 5000;
+    final static int BOOTSTRAP_DELAY = 200*N_NODES;
+    final static int CRITICAL_SECTION_TIME = 5000;
     
     final static int REQUEST_COMMAND = 0;
     final static int CRASH_COMMAND = 1;
@@ -92,6 +93,8 @@ public class DistributedMutualExclusion {
         }
     }
 
+    public static class ExitCriticalSection implements Serializable { }
+
     public static class Node extends AbstractActor {
         protected int id;                                                       // node ID
         protected List<ActorRef> neighbors = null;                              // list of neighbor nodes
@@ -117,9 +120,17 @@ public class DistributedMutualExclusion {
                 asked = false;
                 if (holder.equals(getSelf())) {
                     using = true;
-                    // TODO: schedule node exits the critical section
+                    
+                    System.out.println("(Node " + this.id + ")Enter Critical Section...");
+                    
+                    getContext().system().scheduler().scheduleOnce(Duration.create(CRITICAL_SECTION_TIME, TimeUnit.MILLISECONDS),  
+                        getSelf(),
+                        new ExitCriticalSection(),
+                        getContext().system().dispatcher(), getSelf()
+                        );
+                    
                 } else {
-                    Serializable m = new PrivilegeMessage(this.id);
+                    PrivilegeMessage m = new PrivilegeMessage(this.id);
                     holder.tell(m, getSelf());
                 }
             }
@@ -127,7 +138,8 @@ public class DistributedMutualExclusion {
 
         void makeRequest() {
             // A node can request the privilege only if it has received the INITIALIZE message
-            if (holder == null) return;
+            if (holder == null) 
+                System.err.println("ERROR: No holder");
 
             if (holder != getSelf() & !requestQ.isEmpty() & !asked) {
                 holder.tell(new RequestMessage(this.id), getSelf());
@@ -169,6 +181,7 @@ public class DistributedMutualExclusion {
                 .match(AdviseMessage.class, this::onAdviseMessage)
                 .match(RecoveryMessage.class, this::onRecoveryMessage)
                 .match(UserInputMessage.class, this::onUserInputMessage)
+                .match(ExitCriticalSection.class, this::onExitCriticalSection)
                 .build();
         }
         
@@ -196,6 +209,8 @@ public class DistributedMutualExclusion {
         }
 
         public void onRequestMessage(RequestMessage msg) {
+            System.out.println("<<REQS.MSG>> Node " + this.id + " received from " + msg.senderId);
+            
             requestQ.add(getSender());
             // procedures assignPrivilege and makeRequest are not called during recovery phase
             if (isRecovering) return;
@@ -204,6 +219,8 @@ public class DistributedMutualExclusion {
         }
 
         public void onPrivilegeMessage(PrivilegeMessage msg) {
+            System.out.println("<<PRIV.MSG>> Node " + this.id + " received from " + msg.senderId);
+            
             holder = self();
             // procedures assignPrivilege and makeRequest are not called during recovery phase
             if (isRecovering) return;
@@ -251,8 +268,16 @@ public class DistributedMutualExclusion {
                     break;
             }
         }
+        
+        public void onExitCriticalSection(ExitCriticalSection msg) {
+            System.out.println("(Node " + this.id + ")EXIT Critical Section...");
+            
+            this.using = false;
+            assignPrivilege();
+            makeRequest();
+        }
     }
-
+    
     public static class Graph {
         ArrayList<ArrayList<Integer>> adj;
         int V;
