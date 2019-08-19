@@ -20,27 +20,32 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class DistributedMutualExclusion {
+
     final static int N_NODES = 10;
-    final static int BOOTSTRAP_DELAY = 200*N_NODES;
+    final static int BOOTSTRAP_DELAY = 200 * N_NODES;
     final static int CRITICAL_SECTION_TIME = 5000;
-    
+
     final static int REQUEST_COMMAND = 0;
     final static int CRASH_COMMAND = 1;
-    
+
     public static class Message implements Serializable {
+
         Integer senderId;
+
         public Message(Integer senderId) {
             this.senderId = senderId;
         }
     }
-    
+
     /**
-     * Message sent from the main routine to all nodes in order to communicate 
+     * Message sent from the main routine to all nodes in order to communicate
      * the neighbor list and the identity of the protocol starter
      */
-    public static class BootstrapMessage extends Message implements Serializable{
+    public static class BootstrapMessage extends Message implements Serializable {
+
         List<ActorRef> neighbors;
         boolean isStarter;
+
         public BootstrapMessage(List<ActorRef> neighbors, boolean isStarter) {
             //Bootstrap message is sent only by the main routine and not from 
             //specific nodes
@@ -49,53 +54,63 @@ public class DistributedMutualExclusion {
             this.isStarter = isStarter;
         }
     }
-    
+
     public static class InitializeMessage extends Message implements Serializable {
+
         public InitializeMessage(Integer senderId) {
             super(senderId);
         }
     }
 
     public static class RequestMessage extends Message implements Serializable {
+
         public RequestMessage(Integer senderId) {
             super(senderId);
         }
     }
 
     public static class PrivilegeMessage extends Message implements Serializable {
+
         public PrivilegeMessage(Integer senderId) {
             super(senderId);
         }
     }
 
     public static class RestartMessage extends Message implements Serializable {
+
         public RestartMessage(Integer senderId) {
             super(senderId);
         }
     }
 
     public static class AdviseMessage extends Message implements Serializable {
+
         public AdviseMessage(Integer senderId) {
             super(senderId);
         }
     }
 
     public static class RecoveryMessage extends Message implements Serializable {
+
         public RecoveryMessage(Integer senderId) {
             super(senderId);
         }
     }
 
     public static class UserInputMessage implements Serializable {
+
         protected int commandId;
+
         public UserInputMessage(int commandId) {
             this.commandId = commandId;
         }
     }
 
-    public static class ExitCriticalSection implements Serializable { }
+    public static class ExitCriticalSection implements Serializable {
+    }
 
     public static class Node extends AbstractActor {
+
         protected int id;                                                       // node ID
         protected List<ActorRef> neighbors = null;                              // list of neighbor nodes
         protected ActorRef holder = null;                                       // location of the privilege relative to the node itself
@@ -113,22 +128,22 @@ public class DistributedMutualExclusion {
         static public Props props(int id) {
             return Props.create(Node.class, () -> new Node(id));
         }
-        
+
         void assignPrivilege() {
             if (holder.equals(getSelf()) & !using & !requestQ.isEmpty()) {
                 holder = requestQ.remove();
                 asked = false;
                 if (holder.equals(getSelf())) {
                     using = true;
-                    
+
                     System.out.println("(Node " + this.id + ")Enter Critical Section...");
-                    
-                    getContext().system().scheduler().scheduleOnce(Duration.create(CRITICAL_SECTION_TIME, TimeUnit.MILLISECONDS),  
-                        getSelf(),
-                        new ExitCriticalSection(),
-                        getContext().system().dispatcher(), getSelf()
-                        );
-                    
+
+                    getContext().system().scheduler().scheduleOnce(Duration.create(CRITICAL_SECTION_TIME, TimeUnit.MILLISECONDS),
+                            getSelf(),
+                            new ExitCriticalSection(),
+                            getContext().system().dispatcher(), getSelf()
+                    );
+
                 } else {
                     PrivilegeMessage m = new PrivilegeMessage(this.id);
                     holder.tell(m, getSelf());
@@ -138,8 +153,9 @@ public class DistributedMutualExclusion {
 
         void makeRequest() {
             // A node can request the privilege only if it has received the INITIALIZE message
-            if (holder == null) 
+            if (holder == null) {
                 System.err.println("ERROR: No holder");
+            }
 
             if (holder != getSelf() & !requestQ.isEmpty() & !asked) {
                 holder.tell(new RequestMessage(this.id), getSelf());
@@ -151,11 +167,11 @@ public class DistributedMutualExclusion {
             // We only schedule an init message to the starter itself to account
             //for setup time
             getContext().system().scheduler().scheduleOnce(
-                Duration.create(BOOTSTRAP_DELAY, TimeUnit.MILLISECONDS),  
-                getSelf(),
-                new InitializeMessage(this.id),
-                getContext().system().dispatcher(), getSelf()
-                );
+                    Duration.create(BOOTSTRAP_DELAY, TimeUnit.MILLISECONDS),
+                    getSelf(),
+                    new InitializeMessage(this.id),
+                    getContext().system().dispatcher(), getSelf()
+            );
         }
 
         // emulate a crash and a recovery in a given time
@@ -163,67 +179,74 @@ public class DistributedMutualExclusion {
             System.out.println("CRASH!!!");
             // setting a timer to "recover"
             getContext().system().scheduler().scheduleOnce(
-                Duration.create(recoverIn, TimeUnit.MILLISECONDS),
-                getSelf(),
-                new RecoveryMessage(this.id), // message sent to myself
-                getContext().system().dispatcher(), getSelf()
+                    Duration.create(recoverIn, TimeUnit.MILLISECONDS),
+                    getSelf(),
+                    new RecoveryMessage(this.id), // message sent to myself
+                    getContext().system().dispatcher(), getSelf()
             );
         }
 
         @java.lang.Override
         public Receive createReceive() {
             return receiveBuilder()
-                .match(BootstrapMessage.class, this::onBootstrapMessage)
-                .match(InitializeMessage.class, this::onInitializeMessage)
-                .match(RequestMessage.class, this::onRequestMessage)
-                .match(PrivilegeMessage.class, this::onPrivilegeMessage)
-                .match(RestartMessage.class, this::onRestartMessage)
-                .match(AdviseMessage.class, this::onAdviseMessage)
-                .match(RecoveryMessage.class, this::onRecoveryMessage)
-                .match(UserInputMessage.class, this::onUserInputMessage)
-                .match(ExitCriticalSection.class, this::onExitCriticalSection)
-                .build();
+                    .match(BootstrapMessage.class, this::onBootstrapMessage)
+                    .match(InitializeMessage.class, this::onInitializeMessage)
+                    .match(RequestMessage.class, this::onRequestMessage)
+                    .match(PrivilegeMessage.class, this::onPrivilegeMessage)
+                    .match(RestartMessage.class, this::onRestartMessage)
+                    .match(AdviseMessage.class, this::onAdviseMessage)
+                    .match(RecoveryMessage.class, this::onRecoveryMessage)
+                    .match(UserInputMessage.class, this::onUserInputMessage)
+                    .match(ExitCriticalSection.class, this::onExitCriticalSection)
+                    .build();
         }
-        
+
         public void onBootstrapMessage(BootstrapMessage msg) {
             System.out.println("Received a bootstrap message (Node " + this.id + ") (#Neighbors: " + msg.neighbors.size() + ")");
             this.neighbors = msg.neighbors;
-            
-            if(msg.isStarter){
-                System.out.println("Node " + this.id  + " is the protocol starter");
-                
+
+            if (msg.isStarter) {
+                System.out.println("Node " + this.id + " is the protocol starter");
+
                 initialize();
             }
         }
 
         public void onInitializeMessage(InitializeMessage msg) {
             ActorRef sender = getSender();
-            if(sender == null)
+            if (sender == null) {
                 System.err.println("Issue here");
+            }
             System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + msg.senderId);
             holder = getSender();
-            for (ActorRef neighbor : neighbors) 
-                if(neighbor != holder)
+            for (ActorRef neighbor : neighbors) {
+                if (neighbor != holder) {
                     neighbor.tell(new InitializeMessage(this.id), getSelf());
-            
+                }
+            }
+
         }
 
         public void onRequestMessage(RequestMessage msg) {
             System.out.println("<<REQS.MSG>> Node " + this.id + " received from " + msg.senderId);
-            
+
             requestQ.add(getSender());
             // procedures assignPrivilege and makeRequest are not called during recovery phase
-            if (isRecovering) return;
+            if (isRecovering) {
+                return;
+            }
             assignPrivilege();
             makeRequest();
         }
 
         public void onPrivilegeMessage(PrivilegeMessage msg) {
             System.out.println("<<PRIV.MSG>> Node " + this.id + " received from " + msg.senderId);
-            
+
             holder = self();
             // procedures assignPrivilege and makeRequest are not called during recovery phase
-            if (isRecovering) return;
+            if (isRecovering) {
+                return;
+            }
             assignPrivilege();
             makeRequest();
         }
@@ -244,7 +267,7 @@ public class DistributedMutualExclusion {
                 makeRequest();
             }
         }
-        
+
         public void onRecoveryMessage(RecoveryMessage msg) {
             // TODO: delay for a period sufficiently long to ensure that all messages sent by node X before it failed have been received
             RestartMessage restartMessage = new RestartMessage(this.id);
@@ -268,21 +291,22 @@ public class DistributedMutualExclusion {
                     break;
             }
         }
-        
+
         public void onExitCriticalSection(ExitCriticalSection msg) {
             System.out.println("(Node " + this.id + ")EXIT Critical Section...");
-            
+
             this.using = false;
             assignPrivilege();
             makeRequest();
         }
     }
-    
+
     public static class Graph {
+
         ArrayList<ArrayList<Integer>> adj;
         int V;
 
-        Graph (int V) {
+        Graph(int V) {
             this.V = V;
             adj = new ArrayList<ArrayList<Integer>>(V);
             for (int i = 0; i < V; i++) {
@@ -304,8 +328,9 @@ public class DistributedMutualExclusion {
                 System.out.print("Adjacency list of " + i + ": [");
                 for (int j = 0; j < adj.get(i).size(); j++) {
                     System.out.print(adj.get(i).get(j));
-                    if(j != adj.get(i).size()-1)
+                    if (j != adj.get(i).size() - 1) {
                         System.out.print(", ");
+                    }
                 }
                 System.out.println("]");
             }
@@ -332,29 +357,30 @@ public class DistributedMutualExclusion {
 
         return g;
     }
-    
+
     /**
      * Defines the nodes that are part of the networks
-     * @param args 
+     *
+     * @param args
      */
     public static void main(String[] args) throws IOException {
 
         // 1.Create the actor system
         final ActorSystem system = ActorSystem.create("helloakka");
-        
+
         // 2.Instantiate the nodes
         List<ActorRef> nodes = new ArrayList<>();
         for (int i = 0; i < N_NODES; i++) {
             nodes.add(system.actorOf(Node.props(i), "node" + i));
         }
-        
+
         // 3.Define the network structure      TODO: Would it be better if we read a csv with the adjacency matrix?
         Graph g = createStructure();  // Instantiates the neighbor lists and modify @networkStructure
         g.printAdjacencyList();
 
         // 4.Select the starter
         int starter = 0;
-        
+
         // 5.Tell to the nodes their neighbor lists
         for (int nodeId = 0; nodeId < N_NODES; nodeId++) {
             // Get the IDs of the neighbors
@@ -371,22 +397,21 @@ public class DistributedMutualExclusion {
             if (nodeId == starter) {
                 isStarter = true;
             }
-            
+
             // Prepare a message with the neighbor Reference list and start flag
             BootstrapMessage start = new BootstrapMessage(neighbors, isStarter);
             // Send the bootstrap message
             nodes.get(nodeId).tell(start, null);
         }
 
-        
         // 6.Handle command line input
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         boolean close = false;
-        String out = "Enter:\n" +
-                "- 'r' to send a request\n" +
-                "- 'c' to crash a node\n" +
-                "- 'q' to quit\n" +
-                "Your choice:";
+        String out = "Enter:\n"
+                + "- 'r' to send a request\n"
+                + "- 'c' to crash a node\n"
+                + "- 'q' to quit\n"
+                + "Your choice:";
 
         do {
             System.out.println(out);
