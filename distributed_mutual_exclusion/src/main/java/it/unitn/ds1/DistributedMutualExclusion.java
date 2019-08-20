@@ -6,7 +6,7 @@ import akka.actor.ActorSystem;
 import java.io.BufferedReader;
 import java.io.IOException;
 
-import it.unitn.ds1.messages.BootstrapMessage;
+import it.unitn.ds1.messages.Bootstrap;
 import it.unitn.ds1.messages.UserInput;
 import it.unitn.ds1.network.Graph;
 import it.unitn.ds1.network.Node;
@@ -46,7 +46,7 @@ public class DistributedMutualExclusion {
         return g;
     }
 
-    public static void menu(List<ActorRef> nodes) throws IOException {
+    public static void userInterface(List<ActorRef> nodes) throws IOException {
         // 6.Handle command line input
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         boolean close = false;
@@ -143,12 +143,12 @@ public class DistributedMutualExclusion {
             }
 
             // Prepare a message with the neighbor Reference list and start flag
-            BootstrapMessage start = new BootstrapMessage(neighbors, isStarter);
+            Bootstrap start = new Bootstrap(neighbors, isStarter);
             // Send the bootstrap message
             nodes.get(nodeId).tell(start, null);
         }
 
-        menu(nodes);
+        userInterface(nodes);
         system.terminate();
     }
 }

@@ -109,7 +109,7 @@ public class Node extends AbstractActor {
     @java.lang.Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(BootstrapMessage.class, this::onBootstrapMessage)
+                .match(Bootstrap.class, this::onBootstrapMessage)
                 .match(InitializeMessage.class, this::onInitializeMessage)
                 .match(RequestMessage.class, this::onRequestMessage)
                 .match(PrivilegeMessage.class, this::onPrivilegeMessage)
@@ -121,7 +121,7 @@ public class Node extends AbstractActor {
                 .build();
     }
 
-    private void onBootstrapMessage(BootstrapMessage msg) {
+    private void onBootstrapMessage(Bootstrap msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("BOOTSTRAP message received by node " + id + ". Node " + id + " has: " + msg.getNeighbors().size() + " neighbors");
 
