@@ -24,7 +24,6 @@ public class DistributedMutualExclusion {
     public final static int BOOTSTRAP_DELAY = 200 * N_NODES;
     public final static int CRITICAL_SECTION_TIME = 5000;
     public final static int CRASH_TIME = 5000;
-    static List<ActorRef> nodes = new ArrayList<>();
 
     /**
      * Creates an ArrayList (nodes) containing ArrayLists for neighbors
@@ -47,7 +46,7 @@ public class DistributedMutualExclusion {
         return g;
     }
 
-    public static void menu() throws IOException {
+    public static void menu(List<ActorRef> nodes) throws IOException {
         // 6.Handle command line input
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         boolean close = false;
@@ -114,6 +113,7 @@ public class DistributedMutualExclusion {
         final ActorSystem system = ActorSystem.create("helloakka");
 
         // 2.Instantiate the nodes
+        List<ActorRef> nodes = new ArrayList<>();
         for (int i = 0; i < N_NODES; i++) {
             nodes.add(system.actorOf(Node.props(i), "node" + i));
         }
@@ -148,7 +148,7 @@ public class DistributedMutualExclusion {
             nodes.get(nodeId).tell(start, null);
         }
 
-        menu();
+        menu(nodes);
         system.terminate();
     }
 }
