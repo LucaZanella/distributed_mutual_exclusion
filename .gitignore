@@ -65,3 +65,10 @@ nb-configuration.xml
 ##########################
 .gradle/
 /distributed_mutual_exclusion/.nb-gradle
+
+##########################
+## Logger
+##########################
+distributed_mutual_exclusion/Logging.html
+distributed_mutual_exclusion/Logging.txt
+
