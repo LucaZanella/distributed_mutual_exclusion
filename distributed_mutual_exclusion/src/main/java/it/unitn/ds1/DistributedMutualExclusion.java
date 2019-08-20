@@ -19,6 +19,9 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import it.unitn.ds1.logger.MyLogger;
 
 public class DistributedMutualExclusion {
 
@@ -29,6 +32,9 @@ public class DistributedMutualExclusion {
 
     final static int REQUEST_COMMAND = 0;
     final static int CRASH_COMMAND = 1;
+
+    // use the classname for the logger, this way you can refactor
+    private final static Logger LOGGER = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
     public static class Message implements Serializable {
 
@@ -145,7 +151,8 @@ public class DistributedMutualExclusion {
                 if (holder.equals(getSelf())) {
                     using = true;
 
-                    System.out.println("(Node " + this.id + ")Enter Critical Section...");
+                    LOGGER.setLevel(Level.INFO);
+                    LOGGER.info("Node " + this.id + " ENTER critical section...");
 
                     getContext().system().scheduler().scheduleOnce(Duration.create(CRITICAL_SECTION_TIME, TimeUnit.MILLISECONDS),
                             getSelf(),
@@ -161,9 +168,11 @@ public class DistributedMutualExclusion {
         }
 
         void makeRequest() {
+            LOGGER.setLevel(Level.INFO);
             // A node can request the privilege only if it has received the INITIALIZE message
             if (holder == null) {
-                System.err.println("ERROR: No holder");
+                LOGGER.severe("Node " + id + " is trying to request the PRIVILEGE but has not received the INITIALIZE message");
+                // TODO: Should the code return here? Otherwise the execution will go on
             }
 
             if (holder != getSelf() & !requestQ.isEmpty() & !asked) {
@@ -185,7 +194,8 @@ public class DistributedMutualExclusion {
 
         // emulate a crash and a recovery in a given time
         void crash(int recoverIn) {
-            System.out.println("CRASH!!!");
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("Node " + id + " CRASHED");
             // setting a timer to "recover"
 
             //TODO: See what variables we lose oltre a queste
@@ -217,23 +227,26 @@ public class DistributedMutualExclusion {
         }
 
         public void onBootstrapMessage(BootstrapMessage msg) {
-            System.out.println("Received a bootstrap message (Node " + this.id + ") (#Neighbors: " + msg.neighbors.size() + ")");
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("BOOTSTRAP message received by node " + id + ". Node " + id + " has: " + msg.neighbors.size() + " neighbors");
 
             this.neighbors = msg.neighbors;
 
             if (msg.isStarter) {
-                System.out.println("Node " + this.id + " is the protocol starter");
+                LOGGER.info("STARTER of the protocol is node " + id);
 
                 initialize();
             }
         }
 
         public void onInitializeMessage(InitializeMessage msg) {
-            System.out.println("<<INIT.MSG>> Node " + this.id + " received from " + msg.senderId);
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("INITIALIZE message received by node " + this.id + " from node " + msg.senderId);
 
             ActorRef sender = getSender();
             if (sender == null) {
-                System.err.println("Issue here");
+                // TODO: Can we remove this block of code?
+                LOGGER.severe("The sender of the INITIALIZE message received by node" + this.id + " is NULL");
             }
             holder = getSender();
             for (ActorRef neighbor : neighbors) {
@@ -245,7 +258,8 @@ public class DistributedMutualExclusion {
         }
 
         public void onRequestMessage(RequestMessage msg) {
-            System.out.println("<<REQS.MSG>> Node " + this.id + " received from " + msg.senderId);
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("REQUEST message received by node " + id + " from node " + msg.senderId);
 
             requestQ.add(getSender());
             // procedures assignPrivilege and makeRequest are not called during recovery phase
@@ -256,7 +270,8 @@ public class DistributedMutualExclusion {
         }
 
         public void onPrivilegeMessage(PrivilegeMessage msg) {
-            System.out.println("<<PRIV.MSG>> Node " + this.id + " received from " + msg.senderId);
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("PRIVILEGE message received by node " + id + " from node " + msg.senderId);
 
             holder = self();
             // procedures assignPrivilege and makeRequest are not called during recovery phase
@@ -267,7 +282,8 @@ public class DistributedMutualExclusion {
         }
 
         public void onRestartMessage(RestartMessage msg) {
-            System.out.println("<<REST.MSG>> Node " + this.id + " received from " + msg.senderId);
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("RESTART message received by node " + id + " from node " + msg.senderId);
 
             // DONE: send and ADVISE message informing the recovering node of the state of the relationship with the current node
             
@@ -278,18 +294,22 @@ public class DistributedMutualExclusion {
         }
 
         public void onAdviseMessage(AdviseMessage msg) {
-            System.out.println("<<ADV.MSG>> Node " + this.id + " received from " + msg.senderId);
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("ADVISE message received by node " + id + " from node " + msg.senderId);
 
             adviseMessages.put(getSender(), msg);
                         
             // the node is in recovery phase until all ADVISE messages from each neighbor are received
             if (adviseMessages.keySet().containsAll(neighbors)) {
+                String requestQIds = "[";
+                Integer holderId;
                 // All advise messages have been received
                 // Recovery procedure
                 
                 // 1.determining holder, ASKED and USING
                 this.using = false;
                 this.holder = getSelf();
+                holderId = id;
                 asked = false;
                 for (ActorRef neighbor : adviseMessages.keySet()) {
                     AdviseMessage currentMsg = adviseMessages.get(neighbor);
@@ -297,18 +317,31 @@ public class DistributedMutualExclusion {
                     if (!currentMsg.isXHolder) {
                         // It means that THIS node is not privileged
                         this.holder = neighbor;
+                        holderId = currentMsg.senderId;
                         if (currentMsg.isXInRequestQ)
                             this.asked = true;
                     } else {
                         // 2. Reconstruct Request Queue
                         if (currentMsg.askedY) {
                             requestQ.add(neighbor);
+                            requestQIds += currentMsg.senderId + ", ";
                         }
                     }
                 }
+                if (!requestQ.isEmpty()) {
+                    requestQIds = requestQIds.substring(0, requestQIds.length() - 2);
+                }
+                requestQIds += "]";
 
                 adviseMessages.clear();
                 isRecovering = false;
+
+                LOGGER.info("Node " + id + " has completed RECOVERY. " +
+                        "Holder: " + holderId + ", " +
+                        "Asked: " + asked + ", " +
+                        "RequestQ: " + requestQIds + ", " +
+                        "Using: " + using);
+
                 // After the recovery phase is completed, the node recommence its participation in the algorithm
                 assignPrivilege();
                 makeRequest();
@@ -316,22 +349,25 @@ public class DistributedMutualExclusion {
         }
 
         public void onUserInputMessage(UserInputMessage msg) {
+            LOGGER.setLevel(Level.INFO);
+
             switch (msg.commandId) {
                 case REQUEST_COMMAND:
-                    System.out.println("<<INPUT.MSG> Received REQUEST command (node " + this.id + ")");
+                    LOGGER.info("REQUEST command received by node " + id + " from user");
                     requestQ.add(self());
                     assignPrivilege();
                     makeRequest();
                     break;
                 case CRASH_COMMAND:
-                    System.out.println("<<INPUT.MSG> Received CRASH command (node " + this.id + ")");
+                    LOGGER.info("CRASH command received by node " + id + " from user");
                     crash(CRASH_TIME);
                     break;
             }
         }
 
         public void onExitCriticalSection(ExitCriticalSection msg) {
-            System.out.println("(Node " + this.id + ")EXIT Critical Section...");
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("Node " + this.id + " EXIT critical section...");
 
             this.using = false;
             assignPrivilege();
@@ -339,7 +375,8 @@ public class DistributedMutualExclusion {
         }
 
         public void onRecovery(Recovery msg) {
-            System.out.println("(Node " + this.id + ")Recovery from crash...");
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("Node " + this.id + " starts RECOVERY");
 
             /* We assume that the crash lasts long enough to guarantee that all
              * messages sent before crashing are received by all nodes.
@@ -416,6 +453,13 @@ public class DistributedMutualExclusion {
      * @param args
      */
     public static void main(String[] args) throws IOException {
+
+        try {
+            MyLogger.setup();
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Problems with creating the log files");
+        }
 
         // 1.Create the actor system
         final ActorSystem system = ActorSystem.create("helloakka");
@@ -500,6 +544,7 @@ public class DistributedMutualExclusion {
                 System.out.println("Unknown command. Please try again");
             }
         } while (!close);
+        System.out.println("Closing application...");
         in.close();
         system.terminate();
     }
