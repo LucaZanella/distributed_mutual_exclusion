@@ -3,8 +3,8 @@ package it.unitn.ds1.network;
 import java.util.ArrayList;
 
 /**
- * Represents the computer network.
- * This class is used only at the beginning to create the tree topology.
+ * Represents the computer network. This class is used only at the beginning to
+ * create the tree topology.
  */
 public class Graph {
 
@@ -18,7 +18,9 @@ public class Graph {
     int V;
 
     /**
-     * Creates a Graph with the information about the number of nodes in the network.
+     * Creates a Graph with the information about the number of nodes in the
+     * network.
+     *
      * @param V The number of nodes in the network.
      */
     public Graph(int V) {
@@ -31,6 +33,7 @@ public class Graph {
 
     /**
      * Adds a neighbor v to a node u and vice versa.
+     *
      * @param u The id of a node in the network.
      * @param v The id of a node in the network.
      */
@@ -41,6 +44,7 @@ public class Graph {
 
     /**
      * Gets the neighbors of a node in the network.
+     *
      * @param u The id of the node we want to get the neighbors.
      * @return A list containing the id of the neighbors in the network.
      */

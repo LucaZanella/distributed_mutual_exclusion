@@ -14,12 +14,13 @@ public class Bootstrap implements Serializable {
     private List<ActorRef> neighbors;
     private boolean isStarter;
 
-
     /**
-     * Creates a Boostrap message with the information about the neighbors of a node and if it is the starter
-     * of the protocol.
+     * Creates a Boostrap message with the information about the neighbors of a
+     * node and if it is the starter of the protocol.
+     *
      * @param neighbors The immediate neighbors in the spanning tree.
-     * @param isStarter True if this node is the starter of the protocol, false otherwise.
+     * @param isStarter True if this node is the starter of the protocol, false
+     * otherwise.
      */
     public Bootstrap(List<ActorRef> neighbors, boolean isStarter) {
         // Bootstrap message is sent only by the main routine and not from specific nodes
@@ -27,9 +28,9 @@ public class Bootstrap implements Serializable {
         this.isStarter = isStarter;
     }
 
-
     /**
      * Gets the immediate neighbors in the spanning tree.
+     *
      * @return A list containing the immediate neighbors in the spanning tree.
      */
     public List<ActorRef> getNeighbors() {
@@ -37,7 +38,9 @@ public class Bootstrap implements Serializable {
     }
 
     /**
-     * Gets a boolean that describes if the node that receives the message is the starter of the protocol.
+     * Gets a boolean that describes if the node that receives the message is
+     * the starter of the protocol.
+     *
      * @return True if the node is the starter of the protocol, false otherwise.
      */
     public boolean isStarter() {

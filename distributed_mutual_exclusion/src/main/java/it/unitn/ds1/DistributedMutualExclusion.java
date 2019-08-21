@@ -17,8 +17,8 @@ import java.util.List;
 import it.unitn.ds1.logger.MyLogger;
 
 /**
- * Represents the class where the actor system is created and the user interface is
- * displayed to the user.
+ * Represents the class where the actor system is created and the user interface
+ * is displayed to the user.
  */
 public class DistributedMutualExclusion {
 
@@ -71,6 +71,7 @@ public class DistributedMutualExclusion {
 
     /**
      * Displays the user interface.
+     *
      * @param nodes List of actors representing the nodes of the network
      * @throws IOException
      */
@@ -125,6 +126,7 @@ public class DistributedMutualExclusion {
 
     /**
      * Creates the actor system representing a computer network of nodes
+     *
      * @param args
      */
     public static void main(String[] args) throws IOException {

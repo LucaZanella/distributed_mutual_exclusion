@@ -36,8 +36,8 @@ public class Node extends AbstractActor {
      */
     private ActorRef holder = null;
     /**
-     * Queue containing the neighbors that have sent a REQUEST message.
-     * to the node itself.
+     * Queue containing the neighbors that have sent a REQUEST message. to the
+     * node itself.
      */
     private LinkedList<ActorRef> requestQ = new LinkedList<>();
     /**
@@ -45,7 +45,8 @@ public class Node extends AbstractActor {
      */
     private Boolean using = false;
     /**
-     * Boolean that indicates if the node has sent a REQUEST message to the holder.
+     * Boolean that indicates if the node has sent a REQUEST message to the
+     * holder.
      */
     private Boolean asked = false;
     /**
@@ -68,6 +69,7 @@ public class Node extends AbstractActor {
 
     /**
      * Creates a Node with the information about the id of the node.
+     *
      * @param id The id of the node.
      */
     public Node(int id) {
@@ -77,6 +79,7 @@ public class Node extends AbstractActor {
 
     /**
      * Used by the system to create actors.
+     *
      * @param id The id of the node.
      * @return The actor that we want to create.
      */
@@ -85,15 +88,16 @@ public class Node extends AbstractActor {
     }
 
     /**
-     * Sends the Privilege Message to one of its neighbors who has requested the privilege and
-     * sets the holder accordingly.
-     * The necessary requirement to send the Privilege Message is that the node must hold the
-     * privilege but is not using it, and the request queue is not empty. If the oldest request
-     * for the privilege has come from another node, then the privilege will be sent in its direction,
-     * otherwise the node will begin to use the privilege.
+     * Sends the Privilege Message to one of its neighbors who has requested the
+     * privilege and sets the holder accordingly. The necessary requirement to
+     * send the Privilege Message is that the node must hold the privilege but
+     * is not using it, and the request queue is not empty. If the oldest
+     * request for the privilege has come from another node, then the privilege
+     * will be sent in its direction, otherwise the node will begin to use the
+     * privilege.
      */
     private void assignPrivilege() {
-        
+
         if (holder.equals(getSelf()) & !using & !requestQ.isEmpty()) {
             holder = requestQ.remove();
             asked = false;
@@ -117,9 +121,10 @@ public class Node extends AbstractActor {
     }
 
     /**
-     * Sends a Request Message to the holder because the node does not have the privilege,
-     * but wants it either for itself or others. If a Request Message has already been sent
-     * to the holder, the Request Message would not be sent again.
+     * Sends a Request Message to the holder because the node does not have the
+     * privilege, but wants it either for itself or others. If a Request Message
+     * has already been sent to the holder, the Request Message would not be
+     * sent again.
      */
     private void makeRequest() {
         LOGGER.setLevel(Level.INFO);
@@ -136,7 +141,8 @@ public class Node extends AbstractActor {
     }
 
     /**
-     * Sends an Initialize Message to each of its neighbors to initialize the algorithm.
+     * Sends an Initialize Message to each of its neighbors to initialize the
+     * algorithm.
      */
     private void initialize() {
         // We only schedule an init message to the starter itself to account
@@ -151,10 +157,12 @@ public class Node extends AbstractActor {
 
     /**
      * Emulates a crash and a recovery in a given time.
-     * @param recoverIn Number of milliseconds between the crash and the recovery.
+     *
+     * @param recoverIn Number of milliseconds between the crash and the
+     * recovery.
      */
     private void crash(int recoverIn) {
-        
+
         this.isCrashed = true;
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("Node " + id + " CRASHED");
@@ -165,7 +173,7 @@ public class Node extends AbstractActor {
         this.using = null;
         this.asked = null;
         this.requestQ.clear();
-        
+
         getContext().system().scheduler().scheduleOnce(Duration.create(recoverIn, TimeUnit.MILLISECONDS),
                 getSelf(),
                 new Recovery(), // message sent to myself
@@ -174,7 +182,9 @@ public class Node extends AbstractActor {
     }
 
     /**
-     * Define the mapping between incoming message classes and the methods of the actor.
+     * Define the mapping between incoming message classes and the methods of
+     * the actor.
+     *
      * @return The reaction on the incoming message class.
      */
     @java.lang.Override
@@ -194,6 +204,7 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming Boostrap message.
+     *
      * @param msg The incoming Boostrap message.
      */
     private void onBootstrap(Bootstrap msg) {
@@ -211,6 +222,7 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming Initialize Message.
+     *
      * @param msg The incoming Initialize Message.
      */
     private void onInitializeMessage(InitializeMessage msg) {
@@ -233,6 +245,7 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming Request Message.
+     *
      * @param msg The incoming Request Message.
      */
     private void onRequestMessage(RequestMessage msg) {
@@ -241,8 +254,8 @@ public class Node extends AbstractActor {
             LOGGER.setLevel(Level.INFO);
             LOGGER.info("REQUEST message received by node " + id + " from node " + msg.getSenderId());
             requestQ.add(getSender());
-            
-            if(!isRecovering){
+
+            if (!isRecovering) {
                 assignPrivilege();
                 makeRequest();
             }
@@ -251,6 +264,7 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming Privilege Message.
+     *
      * @param msg The incoming Privilege Message.
      */
     private void onPrivilegeMessage(PrivilegeMessage msg) {
@@ -258,8 +272,8 @@ public class Node extends AbstractActor {
             LOGGER.setLevel(Level.INFO);
             LOGGER.info("PRIVILEGE message received by node " + id + " from node " + msg.getSenderId());
             this.holder = getSelf();
-            
-            if(!isRecovering){
+
+            if (!isRecovering) {
                 assignPrivilege();
                 makeRequest();
             }
@@ -268,6 +282,7 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming Restart Message.
+     *
      * @param msg The incoming Restart Message.
      */
     private void onRestartMessage(RestartMessage msg) {
@@ -275,7 +290,6 @@ public class Node extends AbstractActor {
         LOGGER.info("RESTART message received by node " + id + " from node " + msg.getSenderId());
 
         // DONE: send and ADVISE message informing the recovering node of the state of the relationship with the current node
-
         boolean isXInRequestQ = this.requestQ.contains(getSender());
         boolean isXHolder = this.holder == getSender();
 
@@ -284,12 +298,14 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming Advise Message.
+     *
      * @param msg The incoming Advise Message.
      */
     private void onAdviseMessage(AdviseMessage msg) {
-        if(requestQ.isEmpty() != true)
+        if (requestQ.isEmpty() != true) {
             System.err.println("PROTOCOL ERROR: Queue of crashed node is not empty");
-        
+        }
+
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("ADVISE message received by node " + id + " from node " + msg.getSenderId());
 
@@ -307,7 +323,7 @@ public class Node extends AbstractActor {
             this.holder = getSelf();
             holderId = id;
             asked = false;
-            
+
             for (ActorRef neighbor : adviseMessages.keySet()) {
                 AdviseMessage currentMsg = adviseMessages.get(neighbor);
 
@@ -315,8 +331,9 @@ public class Node extends AbstractActor {
                     // It means that THIS node is not privileged
                     this.holder = neighbor;
                     holderId = currentMsg.getSenderId();
-                    if (currentMsg.isXInRequestQ())
+                    if (currentMsg.isXInRequestQ()) {
                         this.asked = true;
+                    }
                 } else {
                     // 2. Reconstruct Request Queue
                     if (currentMsg.isAskedY()) {
@@ -332,12 +349,12 @@ public class Node extends AbstractActor {
             adviseMessages.clear();
             isRecovering = false;
 
-            LOGGER.info("Node " + id + " has completed RECOVERY. " +
-                    "Holder: " + holderId + ", " +
-                    "Asked: " + asked + ", " +
-                    "RequestQ: " + requestQIds + ", " +
-                    "Using: " + using);
-            
+            LOGGER.info("Node " + id + " has completed RECOVERY. "
+                    + "Holder: " + holderId + ", "
+                    + "Asked: " + asked + ", "
+                    + "RequestQ: " + requestQIds + ", "
+                    + "Using: " + using);
+
             // After the recovery phase is completed, the node recommence its participation in the algorithm
             assignPrivilege();
             makeRequest();
@@ -346,6 +363,7 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming User Input message.
+     *
      * @param msg The incoming User Input message.
      */
     private void onUserInput(UserInput msg) {
@@ -353,22 +371,22 @@ public class Node extends AbstractActor {
 
         switch (msg.getCommandId()) {
             case REQUEST_COMMAND:
-                if(!isCrashed){
+                if (!isCrashed) {
                     LOGGER.info("REQUEST command received by node " + id + " from user");
                     requestQ.add(self());
-                    if(!isRecovering){
+                    if (!isRecovering) {
                         assignPrivilege();
                         makeRequest();
                     }
-                }else{
+                } else {
                     System.err.println("WARNING: Node " + id + " is either crashed or in recovery phase. It cannot accept REQUEST commands");
                 }
                 break;
             case CRASH_COMMAND:
-                if(!isCrashed && !isRecovering && using != null && !using){
+                if (!isCrashed && !isRecovering && using != null && !using) {
                     LOGGER.info("CRASH command received by node " + id + " from user");
                     crash(CRASH_TIME);
-                }else{
+                } else {
                     System.err.println("WARNING: Node " + id + " is either crashed, recovering or in the critical section. It cannot accept CRASH commands");
                 }
                 break;
@@ -377,6 +395,7 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming Exit Critical Section message.
+     *
      * @param msg The incoming Exit Critical Section message.
      */
     private void onExitCriticalSection(ExitCriticalSection msg) {
@@ -390,6 +409,7 @@ public class Node extends AbstractActor {
 
     /**
      * The reaction on an incoming Recovery message.
+     *
      * @param msg The incoming Recovery message.
      */
     private void onRecovery(Recovery msg) {
