@@ -3,17 +3,20 @@ package it.unitn.ds1;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 
-import java.io.BufferedReader;
-import java.io.IOException;
+import java.io.*;
 
 import it.unitn.ds1.messages.Bootstrap;
 import it.unitn.ds1.messages.UserInput;
 import it.unitn.ds1.network.Graph;
 import it.unitn.ds1.network.Node;
 
-import java.io.InputStreamReader;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.InputMismatchException;
 import java.util.List;
+import java.util.Scanner;
+
 import it.unitn.ds1.logger.MyLogger;
 
 /**
@@ -47,6 +50,10 @@ public class DistributedMutualExclusion {
      * Number of milliseconds between the crash and the recovery.
      */
     public final static int CRASH_TIME = 15000;
+    /**
+     * The file path containing the commands to be executed.
+     */
+    public final static String COMMANDS_FILENAME = "commands.txt";
 
     /**
      * Creates the tree topology of the network.
@@ -70,18 +77,65 @@ public class DistributedMutualExclusion {
     }
 
     /**
+     * Checks if the identifier of the node is valid.
+     *
+     * @param nodeId The identifier of the node.
+     * @throws IllegalArgumentException If the identifier of the node is not valid.
+     */
+    public static void checkId(int nodeId) throws IllegalArgumentException {
+        if (!(nodeId < N_NODES & nodeId >= 0)) {
+            throw new IllegalArgumentException();
+        }
+    }
+
+    /**
+     * Gets the UserInput message using the information about the command.
+     *
+     * @param command A string representing the command.
+     * @return A UserInput message containing that command.
+     * @throws IllegalArgumentException If the command is not valid.
+     */
+    public static UserInput getCommand(String command) throws IllegalArgumentException {
+        UserInput msg = null;
+        if (command.equals("r")) {
+            msg = new UserInput(REQUEST_COMMAND);
+        } else if (command.equals("c")) {
+            msg = new UserInput(CRASH_COMMAND);
+        } else {
+            throw new IllegalArgumentException();
+        }
+
+        return msg;
+    }
+
+    /**
+     * Prints on the console the command issued to a node.
+     *
+     * @param msg The UserInput message containing the command.
+     * @param nodeId The identifier of the node to which the command will be issued.
+     */
+    public static void printCommand(UserInput msg, int nodeId) {
+        if (msg.getCommandId() == REQUEST_COMMAND) {
+            System.out.println("REQUEST instruction issued to node " + nodeId);
+        } else if (msg.getCommandId() == CRASH_COMMAND) {
+            System.out.println("CRASH instruction issued to node " + nodeId);
+        }
+    }
+
+    /**
      * Displays the user interface.
      *
      * @param nodes List of actors representing the nodes of the network
      * @throws IOException
      */
     public static void userInterface(List<ActorRef> nodes) throws IOException {
-        // 6.Handle command line input
+        // Handle command line input
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         boolean close = false;
         String out = "Enter:\n"
                 + "- 'r' to send a request\n"
                 + "- 'c' to crash a node\n"
+                + "- 'f' to issue commands from a file\n"
                 + "- 'q' to quit\n"
                 + "Your choice:";
 
@@ -97,23 +151,43 @@ public class DistributedMutualExclusion {
                 boolean readValidNumber = false;
                 while (!readValidNumber) {
                     try {
-                        int nodeID = Integer.parseInt(in.readLine());
-                        if (!(nodeID < N_NODES & nodeID >= 0)) {
-                            throw new IllegalArgumentException();
-                        }
+                        int nodeId = Integer.parseInt(in.readLine());
+                        checkId(nodeId);
                         readValidNumber = true;
 
-                        UserInput msg = null;
-                        if (userInput.equals("r")) {
-                            System.out.println("REQUEST instruction issued to node " + nodeID);
-                            msg = new UserInput(REQUEST_COMMAND);
-                        } else if (userInput.equals("c")) {
-                            System.out.println("CRASH instruction issued to node " + nodeID);
-                            msg = new UserInput(CRASH_COMMAND);
+                        try {
+                            UserInput msg = getCommand(userInput);
+                            nodes.get(nodeId).tell(msg, null);
+                            printCommand(msg, nodeId);
+                        } catch (IllegalArgumentException ex) {
+                            // The execution flow must never enter here
+                            System.out.println("Unknown command");
                         }
-                        nodes.get(nodeID).tell(msg, null);
                     } catch (IllegalArgumentException ex) {
                         System.out.println("Incorrect ID number. Please enter an integer value between 0 and " + (N_NODES - 1));
+                    }
+                }
+            } else if (userInput.equals("f")) {
+                File file = new File(COMMANDS_FILENAME);
+                BufferedReader br = new BufferedReader(new FileReader(file));
+                String line;
+
+                while ((line = br.readLine()) != null) {
+                    try {
+                        String[] split = line.split("\\s+");
+                        String command = split[0];
+                        int nodeId = Integer.parseInt(split[1]);
+                        checkId(nodeId);
+
+                        try {
+                            UserInput msg = getCommand(command);
+                            nodes.get(nodeId).tell(msg, null);
+                            printCommand(msg, nodeId);
+                        } catch (IllegalArgumentException ex) {
+                            System.out.println("Unknown command. Skip line");
+                        }
+                    } catch (IllegalArgumentException ex) {
+                        System.out.println("Incorrect ID number. Skip line");
                     }
                 }
             } else {

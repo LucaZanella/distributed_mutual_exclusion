@@ -377,7 +377,7 @@ public class Node extends AbstractActor {
                         makeRequest();
                     }
                 } else {
-                    System.err.println("WARNING: Node " + id + " is crashed. It cannot accept REQUEST commands");
+                    System.out.println("WARNING: Node " + id + " is crashed. It cannot accept REQUEST commands");
                 }
                 break;
             case CRASH_COMMAND:
@@ -385,7 +385,7 @@ public class Node extends AbstractActor {
                     LOGGER.info("CRASH command received by node " + id + " from user");
                     crash(CRASH_TIME);
                 } else {
-                    System.err.println("WARNING: Node " + id + " is either cras, recovering or in the critical section. It cannot accept CRASH commands");
+                    System.out.println("WARNING: Node " + id + " is either crashed, recovering or in the critical section. It cannot accept CRASH commands");
                 }
                 break;
         }
