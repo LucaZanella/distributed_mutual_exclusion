@@ -93,6 +93,7 @@ public class Node extends AbstractActor {
      * otherwise the node will begin to use the privilege.
      */
     private void assignPrivilege() {
+        
         if (holder.equals(getSelf()) & !using & !requestQ.isEmpty()) {
             holder = requestQ.remove();
             asked = false;
@@ -164,7 +165,7 @@ public class Node extends AbstractActor {
         this.using = null;
         this.asked = null;
         this.requestQ.clear();
-
+        
         getContext().system().scheduler().scheduleOnce(Duration.create(recoverIn, TimeUnit.MILLISECONDS),
                 getSelf(),
                 new Recovery(), // message sent to myself
@@ -235,14 +236,16 @@ public class Node extends AbstractActor {
      * @param msg The incoming Request Message.
      */
     private void onRequestMessage(RequestMessage msg) {
-        LOGGER.setLevel(Level.INFO);
-        LOGGER.info("REQUEST message received by node " + id + " from node " + msg.getSenderId());
-
-        requestQ.add(getSender());
-        // procedures assignPrivilege and makeRequest are not called during recovery phase
-        if (!isCrashed && !isRecovering) {
-            assignPrivilege();
-            makeRequest();
+        // procedures assignPrivilege and makeRequest are not called during crash and recovery phase
+        if (!isCrashed) {
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("REQUEST message received by node " + id + " from node " + msg.getSenderId());
+            requestQ.add(getSender());
+            
+            if(!isRecovering){
+                assignPrivilege();
+                makeRequest();
+            }
         }
     }
 
@@ -256,9 +259,13 @@ public class Node extends AbstractActor {
 
         holder = self();
         // procedures assignPrivilege and makeRequest are not called during recovery phase
-        if (!isCrashed && !isRecovering) {
-            assignPrivilege();
-            makeRequest();
+        if (!isCrashed) {
+            if(!isRecovering){
+                this.holder = getSelf();
+            }else{
+                assignPrivilege();
+                makeRequest();
+            }
         }
     }
 
@@ -283,6 +290,9 @@ public class Node extends AbstractActor {
      * @param msg The incoming Advise Message.
      */
     private void onAdviseMessage(AdviseMessage msg) {
+        if(requestQ.isEmpty() != true)
+            System.err.println("PROTOCOL ERROR: Queue of crashed node is not empty");
+        
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("ADVISE message received by node " + id + " from node " + msg.getSenderId());
 
@@ -300,6 +310,7 @@ public class Node extends AbstractActor {
             this.holder = getSelf();
             holderId = id;
             asked = false;
+            
             for (ActorRef neighbor : adviseMessages.keySet()) {
                 AdviseMessage currentMsg = adviseMessages.get(neighbor);
 
@@ -321,7 +332,6 @@ public class Node extends AbstractActor {
                 requestQIds = requestQIds.substring(0, requestQIds.length() - 2);
             }
             requestQIds += "]";
-
             adviseMessages.clear();
             isRecovering = false;
 
@@ -330,7 +340,7 @@ public class Node extends AbstractActor {
                     "Asked: " + asked + ", " +
                     "RequestQ: " + requestQIds + ", " +
                     "Using: " + using);
-
+            
             // After the recovery phase is completed, the node recommence its participation in the algorithm
             assignPrivilege();
             makeRequest();
@@ -346,11 +356,13 @@ public class Node extends AbstractActor {
 
         switch (msg.getCommandId()) {
             case REQUEST_COMMAND:
-                if(!isCrashed && !isRecovering){
+                if(!isCrashed){
                     LOGGER.info("REQUEST command received by node " + id + " from user");
                     requestQ.add(self());
-                    assignPrivilege();
-                    makeRequest();
+                    if(!isRecovering){
+                        assignPrivilege();
+                        makeRequest();
+                    }
                 }else{
                     System.err.println("WARNING: Node " + id + " is either crashed or in recovery fase. It cannot accept REQUEST commands");
                 }
