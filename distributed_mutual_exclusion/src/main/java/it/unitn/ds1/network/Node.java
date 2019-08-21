@@ -332,8 +332,10 @@ public class Node extends AbstractActor {
                     }
                 } else {
                     // Reconstruct Request Queue
-                    if (currentMsg.isAskedY() && !requestQ.contains(neighbor)) {
-                        requestQ.add(neighbor);
+                    if (currentMsg.isAskedY()) {
+                        if (!requestQ.contains(neighbor)) {
+                            requestQ.add(neighbor);
+                        }
                         requestQIds += currentMsg.getSenderId() + ", ";
                     }
                 }
@@ -383,7 +385,7 @@ public class Node extends AbstractActor {
                     LOGGER.info("CRASH command received by node " + id + " from user");
                     crash(CRASH_TIME);
                 } else {
-                    System.err.println("WARNING: Node " + id + " is either crashed, recovering or in the critical section. It cannot accept CRASH commands");
+                    System.err.println("WARNING: Node " + id + " is either cras, recovering or in the critical section. It cannot accept CRASH commands");
                 }
                 break;
         }
