@@ -254,15 +254,12 @@ public class Node extends AbstractActor {
      * @param msg The incoming Privilege Message.
      */
     private void onPrivilegeMessage(PrivilegeMessage msg) {
-        LOGGER.setLevel(Level.INFO);
-        LOGGER.info("PRIVILEGE message received by node " + id + " from node " + msg.getSenderId());
-
-        holder = self();
-        // procedures assignPrivilege and makeRequest are not called during recovery phase
         if (!isCrashed) {
+            LOGGER.setLevel(Level.INFO);
+            LOGGER.info("PRIVILEGE message received by node " + id + " from node " + msg.getSenderId());
+            this.holder = getSelf();
+            
             if(!isRecovering){
-                this.holder = getSelf();
-            }else{
                 assignPrivilege();
                 makeRequest();
             }
@@ -364,15 +361,15 @@ public class Node extends AbstractActor {
                         makeRequest();
                     }
                 }else{
-                    System.err.println("WARNING: Node " + id + " is either crashed or in recovery fase. It cannot accept REQUEST commands");
+                    System.err.println("WARNING: Node " + id + " is either crashed or in recovery phase. It cannot accept REQUEST commands");
                 }
                 break;
             case CRASH_COMMAND:
-                if(!isCrashed && !isRecovering){
+                if(!isCrashed && !isRecovering && using != null && !using){
                     LOGGER.info("CRASH command received by node " + id + " from user");
                     crash(CRASH_TIME);
                 }else{
-                    System.err.println("WARNING: Node " + id + " is either crashed or in recovery fase. It cannot accept CRASH commands");
+                    System.err.println("WARNING: Node " + id + " is either crashed, recovering or in the critical section. It cannot accept CRASH commands");
                 }
                 break;
         }
