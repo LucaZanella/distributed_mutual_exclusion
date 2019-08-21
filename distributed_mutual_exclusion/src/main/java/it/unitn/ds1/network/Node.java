@@ -302,10 +302,6 @@ public class Node extends AbstractActor {
      * @param msg The incoming Advise Message.
      */
     private void onAdviseMessage(AdviseMessage msg) {
-        if (requestQ.isEmpty() != true) {
-            System.err.println("PROTOCOL ERROR: Queue of crashed node is not empty");
-        }
-
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("ADVISE message received by node " + id + " from node " + msg.getSenderId());
 
@@ -335,8 +331,8 @@ public class Node extends AbstractActor {
                         this.asked = true;
                     }
                 } else {
-                    // 2. Reconstruct Request Queue
-                    if (currentMsg.isAskedY()) {
+                    // Reconstruct Request Queue
+                    if (currentMsg.isAskedY() && !requestQ.contains(neighbor)) {
                         requestQ.add(neighbor);
                         requestQIds += currentMsg.getSenderId() + ", ";
                     }
@@ -379,7 +375,7 @@ public class Node extends AbstractActor {
                         makeRequest();
                     }
                 } else {
-                    System.err.println("WARNING: Node " + id + " is either crashed or in recovery phase. It cannot accept REQUEST commands");
+                    System.err.println("WARNING: Node " + id + " is crashed. It cannot accept REQUEST commands");
                 }
                 break;
             case CRASH_COMMAND:
