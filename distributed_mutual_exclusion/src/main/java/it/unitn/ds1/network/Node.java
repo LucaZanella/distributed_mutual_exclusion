@@ -18,27 +18,76 @@ import static it.unitn.ds1.DistributedMutualExclusion.CRASH_TIME;
 import static it.unitn.ds1.DistributedMutualExclusion.REQUEST_COMMAND;
 import static it.unitn.ds1.DistributedMutualExclusion.CRASH_COMMAND;
 
+/**
+ * Represents a node of the computer network.
+ */
 public class Node extends AbstractActor {
 
-    private int id;                                                       // node ID
-    private List<ActorRef> neighbors = null;                              // list of neighbor nodes
-    private ActorRef holder = null;                                       // location of the privilege relative to the node itself
-    private LinkedList<ActorRef> requestQ = new LinkedList<ActorRef>();   // contains the names of the neighbors that have sent a REQUEST message to the node itself
-    private Boolean using = false;                                        // indicates if the node is executing the critical section
-    private Boolean asked = false;                                        // indicates if the node has sent a REQUEST message to the holder
-    private Boolean isRecovering = false;                                 // indicates if the node is in recovery phase
+    /**
+     * The id of the node.
+     */
+    private int id;
+    /**
+     * List of neighbor nodes.
+     */
+    private List<ActorRef> neighbors = null;
+    /**
+     * Location of the privilege relative to the node itself.
+     */
+    private ActorRef holder = null;
+    /**
+     * Queue containing the neighbors that have sent a REQUEST message.
+     * to the node itself.
+     */
+    private LinkedList<ActorRef> requestQ = new LinkedList<>();
+    /**
+     * Boolean that indicates if the node is executing the critical section.
+     */
+    private Boolean using = false;
+    /**
+     * Boolean that indicates if the node has sent a REQUEST message to the holder.
+     */
+    private Boolean asked = false;
+    /**
+     * Boolean that indicates if the node is in recovery phase.
+     */
+    private Boolean isRecovering = false;
+    /**
+     * Dictionary containing node and advise message pairs for which the node
+     * has received an advise message from.
+     */
     private HashMap<ActorRef, AdviseMessage> adviseMessages = new HashMap<>();
+    /**
+     * Object used to log messages for the application.
+     */
     private final static Logger LOGGER = Logger.getLogger(Logger.GLOBAL_LOGGER_NAME);
 
+    /**
+     * Creates a Node with the information about the id of the node.
+     * @param id The id of the node.
+     */
     public Node(int id) {
         super();
         this.id = id;
     }
 
+    /**
+     * Used by the system to create actors
+     * @param id The id of the node.
+     * @return The actor that we want to create.
+     */
     static public Props props(int id) {
         return Props.create(Node.class, () -> new Node(id));
     }
 
+    /**
+     * Sends the Privilege Message to one of its neighbors who has requested the privilege and
+     * sets the holder accordingly.
+     * The necessary requirement to send the Privilege Message is that the node must hold the
+     * privilege but is not using it, and the request queue is not empty. If the oldest request
+     * for the privilege has come from another node, then the privilege will be sent in its direction,
+     * otherwise the node will begin to use the privilege.
+     */
     private void assignPrivilege() {
         if (holder.equals(getSelf()) & !using & !requestQ.isEmpty()) {
             holder = requestQ.remove();
@@ -62,6 +111,11 @@ public class Node extends AbstractActor {
         }
     }
 
+    /**
+     * Sends a Request Message to the holder because the node does not have the privilege,
+     * but wants it either for itself or others. If a Request Message has already been sent
+     * to the holder, the Request Message would not be sent again.
+     */
     private void makeRequest() {
         LOGGER.setLevel(Level.INFO);
         // A node can request the privilege only if it has received the INITIALIZE message
@@ -76,9 +130,12 @@ public class Node extends AbstractActor {
         }
     }
 
+    /**
+     * Sends an Initialize Message to each of its neighbors to initialize the algorithm.
+     */
     private void initialize() {
         // We only schedule an init message to the starter itself to account
-        //for setup time
+        // for setup time
         getContext().system().scheduler().scheduleOnce(
                 Duration.create(BOOTSTRAP_DELAY, TimeUnit.MILLISECONDS),
                 getSelf(),
@@ -87,7 +144,10 @@ public class Node extends AbstractActor {
         );
     }
 
-    // emulate a crash and a recovery in a given time
+    /**
+     * Emulates a crash and a recovery in a given time.
+     * @param recoverIn Number of milliseconds between the crash and the recovery.
+     */
     private void crash(int recoverIn) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("Node " + id + " CRASHED");
@@ -106,10 +166,14 @@ public class Node extends AbstractActor {
         );
     }
 
+    /**
+     * Define the mapping between incoming message classes and the methods of the actor.
+     * @return The reaction on the incoming message class.
+     */
     @java.lang.Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(Bootstrap.class, this::onBootstrapMessage)
+                .match(Bootstrap.class, this::onBootstrap)
                 .match(InitializeMessage.class, this::onInitializeMessage)
                 .match(RequestMessage.class, this::onRequestMessage)
                 .match(PrivilegeMessage.class, this::onPrivilegeMessage)
@@ -121,7 +185,11 @@ public class Node extends AbstractActor {
                 .build();
     }
 
-    private void onBootstrapMessage(Bootstrap msg) {
+    /**
+     * The reaction on an incoming Boostrap message.
+     * @param msg The incoming Boostrap message.
+     */
+    private void onBootstrap(Bootstrap msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("BOOTSTRAP message received by node " + id + ". Node " + id + " has: " + msg.getNeighbors().size() + " neighbors");
 
@@ -134,6 +202,10 @@ public class Node extends AbstractActor {
         }
     }
 
+    /**
+     * The reaction on an incoming Initialize Message.
+     * @param msg The incoming Initialize Message.
+     */
     private void onInitializeMessage(InitializeMessage msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("INITIALIZE message received by node " + this.id + " from node " + msg.getSenderId());
@@ -152,6 +224,10 @@ public class Node extends AbstractActor {
 
     }
 
+    /**
+     * The reaction on an incoming Request Message.
+     * @param msg The incoming Request Message.
+     */
     private void onRequestMessage(RequestMessage msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("REQUEST message received by node " + id + " from node " + msg.getSenderId());
@@ -164,6 +240,10 @@ public class Node extends AbstractActor {
         }
     }
 
+    /**
+     * The reaction on an incoming Privilege Message.
+     * @param msg The incoming Privilege Message.
+     */
     private void onPrivilegeMessage(PrivilegeMessage msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("PRIVILEGE message received by node " + id + " from node " + msg.getSenderId());
@@ -176,6 +256,10 @@ public class Node extends AbstractActor {
         }
     }
 
+    /**
+     * The reaction on an incoming Restart Message.
+     * @param msg The incoming Restart Message.
+     */
     private void onRestartMessage(RestartMessage msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("RESTART message received by node " + id + " from node " + msg.getSenderId());
@@ -188,6 +272,10 @@ public class Node extends AbstractActor {
         getSender().tell(new AdviseMessage(id, isXHolder, isXInRequestQ, asked), getSelf());
     }
 
+    /**
+     * The reaction on an incoming Advise Message.
+     * @param msg The incoming Advise Message.
+     */
     private void onAdviseMessage(AdviseMessage msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("ADVISE message received by node " + id + " from node " + msg.getSenderId());
@@ -243,6 +331,10 @@ public class Node extends AbstractActor {
         }
     }
 
+    /**
+     * The reaction on an incoming User Input message.
+     * @param msg The incoming User Input message.
+     */
     private void onUserInput(UserInput msg) {
         LOGGER.setLevel(Level.INFO);
 
@@ -260,6 +352,10 @@ public class Node extends AbstractActor {
         }
     }
 
+    /**
+     * The reaction on an incoming Exit Critical Section message.
+     * @param msg The incoming Exit Critical Section message.
+     */
     private void onExitCriticalSection(ExitCriticalSection msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("Node " + this.id + " EXIT critical section...");
@@ -269,6 +365,10 @@ public class Node extends AbstractActor {
         makeRequest();
     }
 
+    /**
+     * The reaction on an incoming Recovery message.
+     * @param msg The incoming Recovery message.
+     */
     private void onRecovery(Recovery msg) {
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("Node " + this.id + " starts RECOVERY");
