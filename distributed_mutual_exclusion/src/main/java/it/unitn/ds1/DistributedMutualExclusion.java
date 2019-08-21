@@ -42,11 +42,11 @@ public class DistributedMutualExclusion {
     /**
      * Number of milliseconds a node is within the critical section.
      */
-    public final static int CRITICAL_SECTION_TIME = 5000;
+    public final static int CRITICAL_SECTION_TIME = 15000;
     /**
      * Number of milliseconds between the crash and the recovery.
      */
-    public final static int CRASH_TIME = 5000;
+    public final static int CRASH_TIME = 15000;
 
     /**
      * Creates the tree topology of the network.

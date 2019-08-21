@@ -49,6 +49,10 @@ public class Node extends AbstractActor {
      */
     private Boolean asked = false;
     /**
+     * Boolean that indicates if the node is crashed.
+     */
+    private Boolean isCrashed = false;
+    /**
      * Boolean that indicates if the node is in recovery phase.
      */
     private Boolean isRecovering = false;
@@ -149,11 +153,13 @@ public class Node extends AbstractActor {
      * @param recoverIn Number of milliseconds between the crash and the recovery.
      */
     private void crash(int recoverIn) {
+        
+        this.isCrashed = true;
         LOGGER.setLevel(Level.INFO);
         LOGGER.info("Node " + id + " CRASHED");
         // setting a timer to "recover"
 
-        //TODO: See what variables we lose oltre a queste
+        //TODO: Check if we lose other variables in addition to these
         this.holder = null;
         this.using = null;
         this.asked = null;
@@ -234,7 +240,7 @@ public class Node extends AbstractActor {
 
         requestQ.add(getSender());
         // procedures assignPrivilege and makeRequest are not called during recovery phase
-        if (!isRecovering) {
+        if (!isCrashed && !isRecovering) {
             assignPrivilege();
             makeRequest();
         }
@@ -250,7 +256,7 @@ public class Node extends AbstractActor {
 
         holder = self();
         // procedures assignPrivilege and makeRequest are not called during recovery phase
-        if (!isRecovering) {
+        if (!isCrashed && !isRecovering) {
             assignPrivilege();
             makeRequest();
         }
@@ -340,14 +346,22 @@ public class Node extends AbstractActor {
 
         switch (msg.getCommandId()) {
             case REQUEST_COMMAND:
-                LOGGER.info("REQUEST command received by node " + id + " from user");
-                requestQ.add(self());
-                assignPrivilege();
-                makeRequest();
+                if(!isCrashed && !isRecovering){
+                    LOGGER.info("REQUEST command received by node " + id + " from user");
+                    requestQ.add(self());
+                    assignPrivilege();
+                    makeRequest();
+                }else{
+                    System.err.println("WARNING: Node " + id + " is either crashed or in recovery fase. It cannot accept REQUEST commands");
+                }
                 break;
             case CRASH_COMMAND:
-                LOGGER.info("CRASH command received by node " + id + " from user");
-                crash(CRASH_TIME);
+                if(!isCrashed && !isRecovering){
+                    LOGGER.info("CRASH command received by node " + id + " from user");
+                    crash(CRASH_TIME);
+                }else{
+                    System.err.println("WARNING: Node " + id + " is either crashed or in recovery fase. It cannot accept CRASH commands");
+                }
                 break;
         }
     }
@@ -377,6 +391,7 @@ public class Node extends AbstractActor {
          * messages sent before crashing are received by all nodes.
          * TODO: check if we need to wait for messages to be received
          */
+        this.isCrashed = false;
         this.isRecovering = true;
         RestartMessage restartMessage = new RestartMessage(this.id);
         for (ActorRef neighbor : neighbors) {
