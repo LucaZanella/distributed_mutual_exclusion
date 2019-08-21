@@ -72,7 +72,7 @@ public class Node extends AbstractActor {
     }
 
     /**
-     * Used by the system to create actors
+     * Used by the system to create actors.
      * @param id The id of the node.
      * @return The actor that we want to create.
      */

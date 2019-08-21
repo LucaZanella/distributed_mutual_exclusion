@@ -16,17 +16,40 @@ import java.util.ArrayList;
 import java.util.List;
 import it.unitn.ds1.logger.MyLogger;
 
+/**
+ * Represents the class where the actor system is created and the user interface is
+ * displayed to the user.
+ */
 public class DistributedMutualExclusion {
 
+    /**
+     * The number of nodes in the network.
+     */
     public final static int N_NODES = 10;
+    /**
+     * The identifier of the command to issue a request to a node.
+     */
     public final static int REQUEST_COMMAND = 0;
+    /**
+     * The identifier of the command to issue a crash to a node.
+     */
     public final static int CRASH_COMMAND = 1;
+    /**
+     * Number of milliseconds the starter has to wait before beginning the
+     * initialization of the protocol.
+     */
     public final static int BOOTSTRAP_DELAY = 200 * N_NODES;
+    /**
+     * Number of milliseconds a node is within the critical section.
+     */
     public final static int CRITICAL_SECTION_TIME = 5000;
+    /**
+     * Number of milliseconds between the crash and the recovery.
+     */
     public final static int CRASH_TIME = 5000;
 
     /**
-     * Creates an ArrayList (nodes) containing ArrayLists for neighbors
+     * Creates the tree topology of the network.
      */
     public static Graph createStructure() {
         // Creating graph with N_NODES vertices
@@ -46,6 +69,11 @@ public class DistributedMutualExclusion {
         return g;
     }
 
+    /**
+     * Displays the user interface.
+     * @param nodes List of actors representing the nodes of the network
+     * @throws IOException
+     */
     public static void userInterface(List<ActorRef> nodes) throws IOException {
         // 6.Handle command line input
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
@@ -96,8 +124,7 @@ public class DistributedMutualExclusion {
     }
 
     /**
-     * Defines the nodes that are part of the networks
-     *
+     * Creates the actor system representing a computer network of nodes
      * @param args
      */
     public static void main(String[] args) throws IOException {

@@ -39,6 +39,7 @@ class MyHtmlFormatter extends Formatter {
         return buf.toString();
     }
 
+    // format the milliseconds of a log record to a readable format
     private String calcDate(long millisecs) {
         SimpleDateFormat date_format = new SimpleDateFormat("MMM dd,yyyy HH:mm");
         Date resultdate = new Date(millisecs);
