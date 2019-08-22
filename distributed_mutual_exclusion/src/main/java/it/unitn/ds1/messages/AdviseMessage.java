@@ -7,9 +7,9 @@ package it.unitn.ds1.messages;
  */
 public class AdviseMessage extends Message {
 
-    private boolean isXHolder;
-    private boolean isXInRequestQ;
-    private boolean askedY;
+    private final boolean isXHolder;
+    private final boolean isXInRequestQ;
+    private final boolean askedY;
 
     /**
      * Creates an Advise Message with the information about the relationship

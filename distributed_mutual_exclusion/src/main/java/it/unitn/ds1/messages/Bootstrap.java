@@ -11,8 +11,8 @@ import java.util.List;
  */
 public class Bootstrap implements Serializable {
 
-    private List<ActorRef> neighbors;
-    private boolean isStarter;
+    private final List<ActorRef> neighbors;
+    private final boolean isStarter;
 
     /**
      * Creates a Boostrap message with the information about the neighbors of a

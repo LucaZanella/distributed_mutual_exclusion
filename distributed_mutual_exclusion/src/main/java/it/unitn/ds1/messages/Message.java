@@ -8,7 +8,7 @@ import java.io.Serializable;
  */
 public abstract class Message implements Serializable {
 
-    private Integer senderId;
+    private final Integer senderId;
 
     /**
      * Creates a Message with the information about the sender.
