@@ -128,15 +128,15 @@ public class Node extends AbstractActor {
      */
     private void makeRequest() {
         LOGGER.setLevel(Level.INFO);
+
         // A node can request the privilege only if it has received the INITIALIZE message
         if (holder == null) {
             LOGGER.severe("Node " + id + " is trying to request the PRIVILEGE but has not received the INITIALIZE message");
-            // TODO: Should the code return here? Otherwise the execution will go on
-        }
-
-        if (holder != getSelf() & !requestQ.isEmpty() & !asked) {
-            holder.tell(new RequestMessage(this.id), getSelf());
-            asked = true;
+        } else {
+            if (holder != getSelf() & !requestQ.isEmpty() & !asked) {
+                holder.tell(new RequestMessage(this.id), getSelf());
+                asked = true;
+            }
         }
     }
 
@@ -253,6 +253,7 @@ public class Node extends AbstractActor {
         if (!isCrashed) {
             LOGGER.setLevel(Level.INFO);
             LOGGER.info("REQUEST message received by node " + id + " from node " + msg.getSenderId());
+
             requestQ.add(getSender());
 
             if (!isRecovering) {
@@ -333,6 +334,8 @@ public class Node extends AbstractActor {
                 } else {
                     // Reconstruct Request Queue
                     if (currentMsg.isAskedY()) {
+                        // During recovery there is the possibility that a node Y will be placed in X's requestQ
+                        // twice. This check avoid for such a duplication
                         if (!requestQ.contains(neighbor)) {
                             requestQ.add(neighbor);
                         }
