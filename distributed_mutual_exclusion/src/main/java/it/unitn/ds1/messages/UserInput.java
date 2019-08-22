@@ -7,7 +7,7 @@ import java.io.Serializable;
  */
 public class UserInput implements Serializable {
 
-    private int commandId;
+    private final int commandId;
 
     /**
      * Creates a User Input message with the information about the command to
