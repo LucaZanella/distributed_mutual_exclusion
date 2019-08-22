@@ -310,26 +310,44 @@ public class Node extends AbstractActor {
 
         // the node is in recovery phase until all ADVISE messages from each neighbor are received
         if (adviseMessages.keySet().containsAll(neighbors)) {
-            String requestQIds = "[";
-            Integer holderId;
             // All advise messages have been received
             // Recovery procedure
 
+            String requestQIds = "[";
+            Integer holderId = id;
+            boolean holdsPrivilege = false;
+
             // 1.determining holder, ASKED and USING
-            this.using = false;
-            this.holder = getSelf();
-            holderId = id;
+            using = false;
             asked = false;
+
+            // After the crash, if no PRIVILEGE message is received, holder is equal to null.
+            if (holder != null) {
+                // This means that this node holds the privilege. This happens because
+                // during the recovery a PRIVILEGE message, that was sent after an ADVISE message,
+                // was received before the ADVISE message itself. The outdated information contained
+                // in the ADVISE message will not be considered.
+                holdsPrivilege = true;
+            } else {
+                holder = getSelf();
+            }
 
             for (ActorRef neighbor : adviseMessages.keySet()) {
                 AdviseMessage currentMsg = adviseMessages.get(neighbor);
 
                 if (!currentMsg.isXHolder()) {
-                    // It means that THIS node is not privileged
-                    this.holder = neighbor;
-                    holderId = currentMsg.getSenderId();
-                    if (currentMsg.isXInRequestQ()) {
-                        this.asked = true;
+                    if (holdsPrivilege) {
+                        // In such a situation the ADVISE message contains outdated information.
+                        // The node has received the privilege from the current neighbor, meaning
+                        // that the node must have requested it, so asked must be true
+                        asked = true;
+                    } else {
+                        // It means that this node is not privileged
+                        this.holder = neighbor;
+                        holderId = currentMsg.getSenderId();
+                        if (currentMsg.isXInRequestQ()) {
+                            this.asked = true;
+                        }
                     }
                 } else {
                     // Reconstruct Request Queue
