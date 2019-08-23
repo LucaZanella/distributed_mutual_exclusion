@@ -4,19 +4,13 @@ import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import it.unitn.ds1.messages.Bootstrap;
 import it.unitn.ds1.messages.UserInput;
 import it.unitn.ds1.network.Graph;
 import it.unitn.ds1.network.Node;
-
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.InputMismatchException;
-import java.util.List;
-import java.util.Scanner;
-
 import it.unitn.ds1.logger.MyLogger;
 
 /**
@@ -29,6 +23,10 @@ public class DistributedMutualExclusion {
      * The number of nodes in the network.
      */
     public final static int N_NODES = 10;
+    /**
+     * The identifier of the node chosen as the initial privileged
+     */
+    public static final int INITIAL_PRIVILEGED_NODE_ID = 0;
     /**
      * The identifier of the command to issue a request to a node.
      */
@@ -212,40 +210,38 @@ public class DistributedMutualExclusion {
             throw new RuntimeException("Problems with creating the log files");
         }
 
-        // 1.Create the actor system
+        // Create the actor system
         final ActorSystem system = ActorSystem.create("helloakka");
 
-        // 2.Instantiate the nodes
+        // Create nodes
         List<ActorRef> nodes = new ArrayList<>();
         for (int i = 0; i < N_NODES; i++) {
             nodes.add(system.actorOf(Node.props(i), "node" + i));
         }
 
-        // 3.Define the network structure      TODO: Would it be better if we read a csv with the adjacency matrix?
-        Graph g = createStructure();  // Instantiates the neighbor lists and modify @networkStructure
+        // Define the tree topology
+        Graph g = createStructure();
         g.printAdjacencyList();
 
-        // 4.Select the starter
-        int starter = 0;
-
-        // 5.Tell to the nodes their neighbor lists
+        // Send boostrap messages to the nodes to inform them of their neighbors
         for (int nodeId = 0; nodeId < N_NODES; nodeId++) {
-            // Get the IDs of the neighbors
+            // Get the identifiers of the neighbors
             ArrayList<Integer> neighborsId = g.getAdjacencyList(nodeId);    // List of neighbors ID
-            List<ActorRef> neighbors = new ArrayList<>();                   // List of neighbors
+            List<ActorRef> neighbors = new ArrayList<>();                   // List of neighbors ActorRef
 
             for (int neighborId : neighborsId) {
                 ActorRef neighbor = nodes.get(neighborId);
                 neighbors.add(neighbor);
             }
 
-            // Check if current node is the selected starter
+            // Check if current node is the initial privileged node
             boolean isStarter = false;
-            if (nodeId == starter) {
+            if (nodeId == INITIAL_PRIVILEGED_NODE_ID) {
                 isStarter = true;
             }
 
-            // Prepare a message with the neighbor Reference list and start flag
+            // Create a bootstrap message containing the neighbors and a flag used to
+            // inform the initial privileged node
             Bootstrap start = new Bootstrap(neighbors, isStarter);
             // Send the bootstrap message
             nodes.get(nodeId).tell(start, null);
