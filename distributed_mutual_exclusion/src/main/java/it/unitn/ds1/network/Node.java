@@ -168,7 +168,6 @@ public class Node extends AbstractActor {
         LOGGER.info("Node " + id + " CRASHED");
         // setting a timer to "recover"
 
-        //TODO: Check if we lose other variables in addition to these
         this.holder = null;
         this.using = null;
         this.asked = null;
@@ -231,7 +230,6 @@ public class Node extends AbstractActor {
 
         ActorRef sender = getSender();
         if (sender == null) {
-            // TODO: Can we remove this block of code?
             LOGGER.severe("The sender of the INITIALIZE message received by node" + this.id + " is NULL");
         }
         holder = getSender();
@@ -441,7 +439,6 @@ public class Node extends AbstractActor {
 
         /* We assume that the crash lasts long enough to guarantee that all
          * messages sent before crashing are received by all nodes.
-         * TODO: check if we need to wait for messages to be received
          */
         this.isCrashed = false;
         this.isRecovering = true;
