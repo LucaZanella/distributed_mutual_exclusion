@@ -341,12 +341,16 @@ public class Node extends AbstractActor {
                         // The node has received the privilege from the current neighbor, meaning
                         // that the node must have requested it, so asked must be true
                         asked = true;
+                        requestQ.add(getSelf());
+                        requestQIds += id + ", ";
                     } else {
                         // It means that this node is not privileged
                         this.holder = neighbor;
                         holderId = currentMsg.getSenderId();
                         if (currentMsg.isXInRequestQ()) {
                             this.asked = true;
+                            requestQ.add(getSelf());
+                            requestQIds += id + ", ";
                         }
                     }
                 } else {

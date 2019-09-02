@@ -73,6 +73,7 @@ public class DistributedMutualExclusion {
 
         return g;
     }
+
     /**
      * Creates a line topology (see image Line)
      */
@@ -282,10 +283,10 @@ public class DistributedMutualExclusion {
         }
 
         // Define the tree topology
-//        Graph g = createStructureLine();
         Graph g = createStructureTree1();
-//        Graph g = createStructureTree2();
-//        Graph g = createStructureTree3();
+        // Graph g = createStructureLine();
+        // Graph g = createStructureTree2();
+        // Graph g = createStructureTree3();
         g.printAdjacencyList();
 
         // Send boostrap messages to the nodes to inform them of their neighbors

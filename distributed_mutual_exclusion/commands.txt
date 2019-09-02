@@ -1,7 +1,7 @@
-r 8
 c 0
-f 1
 r 1
-r 10
+r 2
+r 3
+r 8
 c 8
-r sdas
+r 7
