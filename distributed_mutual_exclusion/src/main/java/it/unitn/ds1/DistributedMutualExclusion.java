@@ -54,9 +54,9 @@ public class DistributedMutualExclusion {
     public final static String COMMANDS_FILENAME = "commands.txt";
 
     /**
-     * Creates the tree topology of the network.
+     * Creates a tree topology of the network. (See image Tree1)
      */
-    public static Graph createStructure() {
+    public static Graph createStructureTree1() {
         // Creating graph with N_NODES vertices
         Graph g = new Graph(N_NODES);
 
@@ -70,6 +70,68 @@ public class DistributedMutualExclusion {
         g.addEdge(2, 6);
         g.addEdge(3, 7);
         g.addEdge(3, 8);
+
+        return g;
+    }
+    /**
+     * Creates a line topology (see image Line)
+     */
+    public static Graph createStructureLine() {
+        // Creating graph with N_NODES vertices
+        Graph g = new Graph(N_NODES);
+
+        // Adding edges one by one
+        g.addEdge(0, 1);
+        g.addEdge(1, 2);
+        g.addEdge(2, 3);
+        g.addEdge(3, 4);
+        g.addEdge(4, 5);
+        g.addEdge(5, 6);
+        g.addEdge(6, 7);
+        g.addEdge(7, 8);
+        g.addEdge(8, 9);
+
+        return g;
+    }
+
+    /**
+     * Creates a (binary) tree topology (see image Tree2)
+     */
+    public static Graph createStructureTree2() {
+        // Creating graph with N_NODES vertices
+        Graph g = new Graph(N_NODES);
+
+        // Adding edges one by one
+        g.addEdge(0, 1);
+        g.addEdge(0, 2);
+        g.addEdge(1, 3);
+        g.addEdge(1, 4);
+        g.addEdge(2, 5);
+        g.addEdge(2, 6);
+        g.addEdge(3, 7);
+        g.addEdge(3, 8);
+        g.addEdge(4, 9);
+
+        return g;
+    }
+
+    /**
+     * Creates a unbalanced tree topology (see image Tree3)
+     */
+    public static Graph createStructureTree3() {
+        // Creating graph with N_NODES vertices
+        Graph g = new Graph(N_NODES);
+
+        // Adding edges one by one
+        g.addEdge(0, 1);
+        g.addEdge(0, 2);
+        g.addEdge(0, 3);
+        g.addEdge(3, 4);
+        g.addEdge(3, 5);
+        g.addEdge(3, 6);
+        g.addEdge(3, 7);
+        g.addEdge(3, 8);
+        g.addEdge(3, 9);
 
         return g;
     }
@@ -220,7 +282,10 @@ public class DistributedMutualExclusion {
         }
 
         // Define the tree topology
-        Graph g = createStructure();
+//        Graph g = createStructureLine();
+        Graph g = createStructureTree1();
+//        Graph g = createStructureTree2();
+//        Graph g = createStructureTree3();
         g.printAdjacencyList();
 
         // Send boostrap messages to the nodes to inform them of their neighbors
